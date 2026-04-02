@@ -1,0 +1,5 @@
+ignoredBuiltDependencies:
+  - esbuild
+  - protobufjs
+onlyBuiltDependencies:
+  - electron

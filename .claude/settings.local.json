@@ -1,0 +1,35 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(python:*)",
+      "Bash(curl:*)",
+      "Bash(npx electron-vite:*)",
+      "Bash(pnpm install:*)",
+      "Bash(pnpm add:*)",
+      "Bash(pnpm run:*)",
+      "Bash(node:*)",
+      "Bash(where electron:*)",
+      "Bash(set:*)",
+      "Bash(ELECTRON_MIRROR=https://cdn.npmmirror.com/binaries/electron/ pnpm rebuild:*)",
+      "Bash(netstat:*)",
+      "Bash(taskkill:*)",
+      "mcp__ide__executeCode",
+      "WebFetch(domain:zread.ai)",
+      "Bash(pnpm dev:*)",
+      "Bash(rm:*)",
+      "Bash(grep:*)",
+      "Bash(pnpm build:*)",
+      "Bash(sqlite3:*)",
+      "Bash(sed:*)",
+      "Bash(pnpm test:run:*)",
+      "Bash(pnpm:*)",
+      "Bash(echo:*)",
+      "Bash(dir D:\\\\SevenClaw\\\\Seven\\\\src\\\\main:*)",
+      "Bash(git checkout:*)",
+      "Bash(xxd:*)",
+      "Bash(awk NR==358:*)",
+      "Bash(powershell:*)",
+      "mcp__ide__getDiagnostics"
+    ]
+  }
+}
