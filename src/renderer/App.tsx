@@ -1,109 +1,633 @@
-import { useState } from 'react'
-import { Layout, Tooltip } from 'antd'
+import { useState, useEffect, useRef } from 'react'
 import {
   MessageOutlined,
   BookOutlined,
-  ExperimentOutlined
+  ExperimentOutlined,
+  ToolOutlined,
+  PlusOutlined,
+  SettingOutlined,
+  DeleteOutlined,
+  EditOutlined,
+  CheckOutlined,
+  CloseOutlined,
+  SunOutlined,
+  MoonOutlined
 } from '@ant-design/icons'
+import { Input, message } from 'antd'
 import ChatArea from './components/ChatArea'
 import ModelSettings from './components/ModelSettings'
+import ToolsTab from './components/ToolsTab'
 import TitleBar from './components/TitleBar'
 import './styles/index.css'
 
-const { Content } = Layout
-
+// 工具栏配置
 const tools = [
-  { key: 'chat', icon: <MessageOutlined />, title: '对话' },
-  { key: 'knowledge', icon: <BookOutlined />, title: '知识库' },
-  { key: 'models', icon: <ExperimentOutlined />, title: '模型' }
+  { key: 'chat', icon: <MessageOutlined />, title: '对话', label: 'Chat' },
+  { key: 'tools', icon: <ToolOutlined />, title: '工具', label: 'Tools' },
+  { key: 'knowledge', icon: <BookOutlined />, title: '知识库', label: 'Knowledge' },
+  { key: 'models', icon: <ExperimentOutlined />, title: '模型', label: 'Models' }
 ]
+
+// 会话类型
+interface Session {
+  id: string
+  title: string
+  updatedAt: string
+  pinned?: boolean
+}
+
+// 主题类型
+type Theme = 'dark' | 'light'
 
 function App(): JSX.Element {
   const [currentTool, setCurrentTool] = useState<string>('chat')
+  const [sessions, setSessions] = useState<Session[]>([])
+  const [currentSessionId, setCurrentSessionId] = useState<string>('')
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
+  const [editingSessionId, setEditingSessionId] = useState<string | null>(null)
+  const [editingTitle, setEditingTitle] = useState('')
+  const [theme, setTheme] = useState<Theme>('dark')
+  const inputRef = useRef<Input>(null)
 
+  // 初始化主题 - 确保默认主题正确设置到 document
+  useEffect(() => {
+    const savedTheme = localStorage.getItem('theme') as Theme
+    const currentTheme = savedTheme || 'dark'
+    setTheme(currentTheme)
+    document.documentElement.setAttribute('data-theme', currentTheme)
+  }, [])
+
+  // 切换主题
+  const toggleTheme = () => {
+    const newTheme = theme === 'dark' ? 'light' : 'dark'
+    setTheme(newTheme)
+    localStorage.setItem('theme', newTheme)
+    document.documentElement.setAttribute('data-theme', newTheme)
+  }
+
+  // 创建新会话
+  const handleNewSession = async () => {
+    try {
+      const newSession = await window.api.session.create({
+        id: 'session_' + Date.now(),
+        title: '新对话',
+        model: 'minimax'
+      })
+      setSessions(prev => [newSession, ...prev])
+      setCurrentSessionId(newSession.id)
+    } catch (error) {
+      console.error('Create session error:', error)
+    }
+  }
+
+  // 加载会话列表
+  useEffect(() => {
+    loadSessions()
+  }, [])
+
+  const loadSessions = async () => {
+    try {
+      const result = await window.api.session.getList(0, 50)
+      if (result.sessions && result.sessions.length > 0) {
+        // 按更新时间排序，置顶的在前
+        const sortedSessions = result.sessions.sort((a: Session, b: Session) => {
+          if (a.pinned && !b.pinned) return -1
+          if (!a.pinned && b.pinned) return 1
+          return new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()
+        })
+        setSessions(sortedSessions)
+        // 自动选择第一个会话（如果没有选中）
+        if (!currentSessionId) {
+          setCurrentSessionId(sortedSessions[0].id)
+        }
+      } else {
+        // 没有会话时自动创建新会话
+        await handleNewSession()
+      }
+    } catch (error) {
+      console.error('Load sessions error:', error)
+      // 出错时也创建新会话
+      await handleNewSession()
+    }
+  }
+
+  // 删除会话
+  const handleDeleteSession = async (e: React.MouseEvent, sessionId: string) => {
+    e.stopPropagation()
+    try {
+      await window.api.session.delete(sessionId)
+      setSessions(prev => prev.filter(s => s.id !== sessionId))
+      if (currentSessionId === sessionId) {
+        setCurrentSessionId(sessions[0]?.id || '')
+      }
+    } catch (error) {
+      console.error('Delete session error:', error)
+    }
+  }
+
+  // 开始编辑会话名称
+  const handleStartEditTitle = (e: React.MouseEvent, session: Session) => {
+    e.stopPropagation()
+    setEditingSessionId(session.id)
+    setEditingTitle(session.title || '新对话')
+    setTimeout(() => {
+      inputRef.current?.focus()
+    }, 50)
+  }
+
+  // 提交编辑
+  const handleSubmitEditTitle = async (sessionId: string) => {
+    if (!editingTitle.trim()) {
+      setEditingSessionId(null)
+      return
+    }
+    try {
+      await window.api.session.update(sessionId, { title: editingTitle.trim() })
+      setSessions(prev => prev.map(s =>
+        s.id === sessionId ? { ...s, title: editingTitle.trim() } : s
+      ))
+      setEditingSessionId(null)
+      message.success('已重命名')
+    } catch (error) {
+      console.error('Update title error:', error)
+      message.error('重命名失败')
+    }
+  }
+
+  // 取消编辑
+  const handleCancelEditTitle = () => {
+    setEditingSessionId(null)
+    setEditingTitle('')
+  }
+
+  // 切换会话
+  const handleSelectSession = (sessionId: string) => {
+    if (editingSessionId) return
+    setCurrentSessionId(sessionId)
+    setCurrentTool('chat')
+  }
+
+  // 渲染主内容
   const renderContent = () => {
     switch (currentTool) {
       case 'models':
       case 'settings':
         return <ModelSettings />
+      case 'tools':
+        return <ToolsTab />
       default:
-        return <ChatArea tool={currentTool} />
+        return <ChatArea tool={currentTool} sessionId={currentSessionId} onSessionUpdate={loadSessions} />
     }
   }
 
   return (
-    <Layout className="app-layout">
+    <div className="app-container">
       <TitleBar />
-      <Content className="app-content">
-        {renderContent()}
-      </Content>
-      <div className="bottom-tabs">
-        <div className="tabs-container">
-          {tools.map((tool) => (
-            <Tooltip key={tool.key} title={tool.title} placement="top">
+
+      <div className="app-main">
+        {/* 侧边栏 */}
+        <aside className={`sidebar ${sidebarCollapsed ? 'collapsed' : ''}`}>
+          {/* 新建会话按钮 */}
+          <div className="sidebar-header">
+            <button className="new-chat-btn" onClick={handleNewSession}>
+              <PlusOutlined />
+              <span>新建对话</span>
+            </button>
+          </div>
+
+          {/* 会话列表 */}
+          <div className="session-list">
+            <div className="session-list-header">
+              <span>会话历史</span>
+            </div>
+            {sessions.map((session) => (
               <div
-                className={`tab-item ${currentTool === tool.key ? 'active' : ''}`}
-                onClick={() => setCurrentTool(tool.key)}
+                key={session.id}
+                className={`session-item ${currentSessionId === session.id && currentTool === 'chat' ? 'active' : ''}`}
+                onClick={() => handleSelectSession(session.id)}
               >
-                {tool.icon}
-                <span className="tab-label">{tool.title}</span>
+                <div className="session-icon">
+                  <MessageOutlined />
+                </div>
+                <div className="session-info">
+                  {editingSessionId === session.id ? (
+                    <div className="session-title-edit" onClick={e => e.stopPropagation()}>
+                      <Input
+                        ref={inputRef}
+                        value={editingTitle}
+                        onChange={e => setEditingTitle(e.target.value)}
+                        onPressEnter={() => handleSubmitEditTitle(session.id)}
+                        onBlur={() => handleSubmitEditTitle(session.id)}
+                        size="small"
+                        style={{ width: '100%' }}
+                      />
+                    </div>
+                  ) : (
+                    <div className="session-title">{session.title || '新对话'}</div>
+                  )}
+                  <div className="session-time">
+                    {new Date(session.updatedAt).toLocaleDateString('zh-CN', {
+                      month: 'short',
+                      day: 'numeric'
+                    })}
+                  </div>
+                </div>
+                <div className="session-actions">
+                  {editingSessionId === session.id ? (
+                    <>
+                      <button
+                        className="session-action-btn"
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          handleSubmitEditTitle(session.id)
+                        }}
+                      >
+                        <CheckOutlined />
+                      </button>
+                      <button
+                        className="session-action-btn"
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          handleCancelEditTitle()
+                        }}
+                      >
+                        <CloseOutlined />
+                      </button>
+                    </>
+                  ) : (
+                    <>
+                      <button
+                        className="session-action-btn"
+                        onClick={(e) => handleStartEditTitle(e, session)}
+                      >
+                        <EditOutlined />
+                      </button>
+                      <button
+                        className="session-action-btn"
+                        onClick={(e) => handleDeleteSession(e, session.id)}
+                      >
+                        <DeleteOutlined />
+                      </button>
+                    </>
+                  )}
+                </div>
               </div>
-            </Tooltip>
-          ))}
-        </div>
+            ))}
+            {sessions.length === 0 && (
+              <div className="session-empty">
+                <p>暂无会话</p>
+                <p className="hint">点击上方按钮开始新对话</p>
+              </div>
+            )}
+          </div>
+
+          {/* 侧边栏底部 */}
+          <div className="sidebar-footer">
+            <div
+              className={`sidebar-tool ${currentTool === 'models' ? 'active' : ''}`}
+              onClick={() => setCurrentTool('models')}
+            >
+              <SettingOutlined />
+              <span>设置</span>
+            </div>
+          </div>
+        </aside>
+
+        {/* 主内容区 */}
+        <main className="main-content">
+          {/* 顶部工具栏 */}
+          <div className="toolbar">
+            <div className="toolbar-tabs">
+              {tools.map((tool) => (
+                <div
+                  key={tool.key}
+                  className={`toolbar-tab ${currentTool === tool.key ? 'active' : ''}`}
+                  onClick={() => setCurrentTool(tool.key)}
+                >
+                  {tool.icon}
+                  <span>{tool.title}</span>
+                </div>
+              ))}
+            </div>
+            
+            {/* 主题切换按钮 */}
+            <div className="toolbar-actions">
+              <button className="theme-toggle-btn" onClick={toggleTheme} title="切换主题">
+                {theme === 'dark' ? <SunOutlined /> : <MoonOutlined />}
+              </button>
+            </div>
+          </div>
+
+          {/* 内容区域 */}
+          <div className="content-area">
+            {renderContent()}
+          </div>
+        </main>
       </div>
+
       <style>{`
-        .app-layout {
-          height: 100vh;
-          background: #f2f2f7;
-        }
-        .app-content {
-          flex: 1;
-          overflow: auto;
-          background: #f2f2f7;
-        }
-        .bottom-tabs {
-          padding: 8px 16px;
-          padding-bottom: calc(8px + env(safe-area-inset-bottom));
-          background: rgba(255, 255, 255, 0.85);
-          backdrop-filter: blur(20px);
-          -webkit-backdrop-filter: blur(20px);
-          border-top: 0.5px solid rgba(0, 0, 0, 0.08);
-        }
-        .tabs-container {
-          display: flex;
-          justify-content: center;
-          align-items: center;
-          gap: 8px;
-        }
-        .tab-item {
+        .app-container {
           display: flex;
           flex-direction: column;
+          height: 100vh;
+          background: var(--bg-primary);
+          overflow: hidden;
+        }
+
+        .app-main {
+          display: flex;
+          flex: 1;
+          overflow: hidden;
+        }
+
+        /* 侧边栏 */
+        .sidebar {
+          width: 260px;
+          background: var(--bg-secondary);
+          border-right: 1px solid var(--border-subtle);
+          display: flex;
+          flex-direction: column;
+          transition: width var(--transition-smooth);
+          overflow: hidden;
+        }
+
+        .sidebar.collapsed {
+          width: 60px;
+        }
+
+        .sidebar-header {
+          padding: var(--spacing-md);
+          border-bottom: 1px solid var(--border-subtle);
+        }
+
+        .new-chat-btn {
+          display: flex;
           align-items: center;
           justify-content: center;
-          padding: 8px 24px;
-          border-radius: 16px;
-          color: #8e8e93;
-          cursor: pointer;
-          font-size: 20px;
-          transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
-          min-width: 72px;
-        }
-        .tab-item:hover {
-          background: rgba(0, 0, 0, 0.04);
-        }
-        .tab-item.active {
-          color: #007aff;
-          background: rgba(0, 122, 255, 0.12);
-          box-shadow: 0 2px 8px rgba(0, 122, 255, 0.15);
-        }
-        .tab-label {
-          font-size: 11px;
-          margin-top: 2px;
+          gap: var(--spacing-sm);
+          width: 100%;
+          padding: 12px 16px;
+          background: var(--gradient-primary);
+          border: none;
+          border-radius: var(--radius-md);
+          color: white;
+          font-size: 14px;
           font-weight: 500;
+          cursor: pointer;
+          transition: var(--transition-smooth);
+          box-shadow: 0 2px 8px rgba(99, 102, 241, 0.3);
+        }
+
+        .new-chat-btn:hover {
+          transform: translateY(-2px);
+          box-shadow: 0 4px 16px rgba(99, 102, 241, 0.4);
+        }
+
+        .new-chat-btn:active {
+          transform: translateY(0);
+        }
+
+        /* 会话列表 */
+        .session-list {
+          flex: 1;
+          overflow-y: auto;
+          padding: var(--spacing-sm) 0;
+        }
+
+        .session-list-header {
+          padding: var(--spacing-sm) var(--spacing-md);
+          font-size: 11px;
+          font-weight: 600;
+          text-transform: uppercase;
+          letter-spacing: 0.5px;
+          color: var(--text-muted);
+        }
+
+        .session-item {
+          display: flex;
+          align-items: center;
+          gap: var(--spacing-sm);
+          padding: 10px var(--spacing-md);
+          margin: 2px 8px;
+          border-radius: var(--radius-md);
+          cursor: pointer;
+          transition: var(--transition-fast);
+          position: relative;
+        }
+
+        .session-item:hover {
+          background: var(--bg-tertiary);
+        }
+
+        .session-item.active {
+          background: rgba(99, 102, 241, 0.15);
+        }
+
+        .session-item.active::before {
+          content: '';
+          position: absolute;
+          left: 0;
+          top: 50%;
+          transform: translateY(-50%);
+          width: 3px;
+          height: 60%;
+          background: var(--gradient-primary);
+          border-radius: 0 2px 2px 0;
+        }
+
+        .session-icon {
+          width: 32px;
+          height: 32px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          background: var(--bg-tertiary);
+          border-radius: var(--radius-sm);
+          color: var(--text-secondary);
+          font-size: 14px;
+          flex-shrink: 0;
+        }
+
+        .session-item.active .session-icon {
+          background: var(--gradient-primary);
+          color: white;
+        }
+
+        .session-info {
+          flex: 1;
+          min-width: 0;
+        }
+
+        .session-title {
+          font-size: 13px;
+          font-weight: 500;
+          color: var(--text-primary);
+          white-space: nowrap;
+          overflow: hidden;
+          text-overflow: ellipsis;
+        }
+
+        .session-title-edit {
+          width: 100%;
+        }
+
+        .session-title-edit .ant-input {
+          font-size: 13px;
+        }
+
+        .session-time {
+          font-size: 11px;
+          color: var(--text-muted);
+          margin-top: 2px;
+        }
+
+        .session-actions {
+          display: flex;
+          gap: 4px;
+          opacity: 0;
+          transition: var(--transition-fast);
+        }
+
+        .session-item:hover .session-actions {
+          opacity: 1;
+        }
+
+        .session-action-btn {
+          width: 24px;
+          height: 24px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          background: transparent;
+          border: none;
+          border-radius: var(--radius-sm);
+          color: var(--text-muted);
+          cursor: pointer;
+          transition: var(--transition-fast);
+        }
+
+        .session-action-btn:hover {
+          background: var(--bg-elevated);
+          color: var(--text-primary);
+        }
+
+        .session-empty {
+          padding: var(--spacing-xl);
+          text-align: center;
+          color: var(--text-muted);
+        }
+
+        .session-empty .hint {
+          font-size: 12px;
+          margin-top: var(--spacing-sm);
+        }
+
+        /* 侧边栏底部 */
+        .sidebar-footer {
+          padding: var(--spacing-md);
+          border-top: 1px solid var(--border-subtle);
+        }
+
+        .sidebar-tool {
+          display: flex;
+          align-items: center;
+          gap: var(--spacing-sm);
+          padding: 10px var(--spacing-md);
+          border-radius: var(--radius-md);
+          color: var(--text-secondary);
+          cursor: pointer;
+          transition: var(--transition-fast);
+        }
+
+        .sidebar-tool:hover {
+          background: var(--bg-tertiary);
+          color: var(--text-primary);
+        }
+
+        .sidebar-tool.active {
+          background: rgba(99, 102, 241, 0.15);
+          color: var(--primary-light);
+        }
+
+        /* 主内容区 */
+        .main-content {
+          flex: 1;
+          display: flex;
+          flex-direction: column;
+          overflow: hidden;
+          background: var(--bg-primary);
+        }
+
+        /* 工具栏 */
+        .toolbar {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          padding: var(--spacing-sm) var(--spacing-md);
+          background: var(--bg-secondary);
+          border-bottom: 1px solid var(--border-subtle);
+        }
+
+        .toolbar-tabs {
+          display: flex;
+          gap: var(--spacing-xs);
+        }
+
+        .toolbar-tab {
+          display: flex;
+          align-items: center;
+          gap: 6px;
+          padding: 8px 16px;
+          border-radius: var(--radius-md);
+          color: var(--text-secondary);
+          font-size: 13px;
+          cursor: pointer;
+          transition: var(--transition-fast);
+        }
+
+        .toolbar-tab:hover {
+          background: var(--bg-tertiary);
+          color: var(--text-primary);
+        }
+
+        .toolbar-tab.active {
+          background: rgba(99, 102, 241, 0.15);
+          color: var(--primary-light);
+        }
+
+        .toolbar-actions {
+          display: flex;
+          align-items: center;
+          gap: var(--spacing-sm);
+        }
+
+        .theme-toggle-btn {
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          width: 36px;
+          height: 36px;
+          background: var(--bg-tertiary);
+          border: 1px solid var(--border-default);
+          border-radius: var(--radius-md);
+          color: var(--text-secondary);
+          cursor: pointer;
+          transition: var(--transition-smooth);
+        }
+
+        .theme-toggle-btn:hover {
+          background: var(--bg-elevated);
+          color: var(--primary);
+          border-color: var(--primary);
+        }
+
+        /* 内容区域 */
+        .content-area {
+          flex: 1;
+          overflow: hidden;
         }
       `}</style>
-    </Layout>
+    </div>
   )
 }
 

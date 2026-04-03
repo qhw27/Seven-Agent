@@ -1,6 +1,13 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
-import { Input, Button, Select, Spin, Empty, Modal, message } from 'antd'
-import { SendOutlined, RobotOutlined, UserOutlined } from '@ant-design/icons'
+import { Input, Button, Select, Spin, Empty, Modal, message, Tooltip } from 'antd'
+import { 
+  SendOutlined, 
+  RobotOutlined, 
+  UserOutlined,
+  DeleteOutlined,
+  LoadingOutlined,
+  ModelOutlined
+} from '@ant-design/icons'
 
 const { TextArea } = Input
 
@@ -13,6 +20,52 @@ interface Message {
 
 interface ChatAreaProps {
   tool: string
+  sessionId: string
+  onSessionUpdate?: () => void
+}
+
+// 需要注入时间的模式
+const NEED_TIME_PATTERNS = [
+  /最新.*新闻/i,
+  /今天.*几号/i,
+  /今天.*日期/i,
+  /当前.*时间/i,
+  /现在.*几点/i,
+  /今天.*星期/i,
+  /今天.*什么.*日/i,
+  /今天.*天/i,
+  /几号/i,
+  /星期/i,
+  /几月/i,
+  /哪一年/i,
+  /今日/i,
+  /当天/i,
+  /天气/i,
+  /气温/i,
+  /温度/i,
+  /下雨/i,
+  /晴天/i,
+  /阴天/i,
+  /刮风/i,
+  /湿度/i
+]
+
+// 注入时间到需要最新信息的查询
+function enhanceWithCurrentTime(prompt: string): string {
+  const now = new Date()
+  const timeStr = now.toLocaleString('zh-CN', {
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric',
+    weekday: 'long',
+    hour: '2-digit',
+    minute: '2-digit'
+  })
+
+  if (NEED_TIME_PATTERNS.some(p => p.test(prompt))) {
+    return `[当前时间: ${timeStr}]\n${prompt}`
+  }
+  return prompt
 }
 
 // 命令类型
@@ -43,8 +96,9 @@ Shift+Enter - 换行
 Enter - 发送消息`
       Modal.info({
         title: '帮助',
-        content: <pre style={{ whiteSpace: 'pre-wrap', margin: 0 }}>{helpText}</pre>,
-        width: 400
+        content: <pre style={{ whiteSpace: 'pre-wrap', margin: 0, fontFamily: 'inherit' }}>{helpText}</pre>,
+        width: 400,
+        centered: true
       })
     }
   },
@@ -74,7 +128,7 @@ Enter - 发送消息`
   }
 ]
 
-function ChatArea({ tool }: ChatAreaProps): JSX.Element {
+function ChatArea({ tool, sessionId, onSessionUpdate }: ChatAreaProps): JSX.Element {
   const [messages, setMessages] = useState<Message[]>([])
   const [input, setInput] = useState('')
   const [loading, setLoading] = useState(false)
@@ -84,6 +138,61 @@ function ChatArea({ tool }: ChatAreaProps): JSX.Element {
   const [showCommandHint, setShowCommandHint] = useState(false)
   const [commandHints, setCommandHints] = useState<Command[]>([])
   const [selectedHintIndex, setSelectedHintIndex] = useState(0)
+  const [streamingContent, setStreamingContent] = useState('')
+
+  // 加载会话消息
+  useEffect(() => {
+    if (sessionId) {
+      loadSessionMessages()
+    }
+  }, [sessionId])
+
+  // 加载模型列表
+  useEffect(() => {
+    loadModels()
+  }, [])
+
+  const loadSessionMessages = async () => {
+    if (!sessionId) return
+    try {
+      const sessionData = await window.api.session.get(sessionId)
+      if (sessionData && sessionData.messages) {
+        setMessages(sessionData.messages.map((m: any) => ({
+          id: m.id,
+          role: m.role,
+          content: m.content,
+          timestamp: new Date(m.createdAt).getTime()
+        })))
+      }
+    } catch (error) {
+      console.error('Load session messages error:', error)
+    }
+  }
+
+  const loadModels = async () => {
+    try {
+      const models = await window.api.ai.listModels()
+      const configuredModels = models.filter((m: any) => m.configured)
+      const options = configuredModels.map((m: any) => ({
+        value: m.id,
+        label: m.name
+      }))
+      setModelOptions(options)
+      if (options.length > 0 && !options.find(o => o.value === model)) {
+        setModel(options[0].value)
+      }
+    } catch (error) {
+      console.error('Load models error:', error)
+    }
+  }
+
+  const scrollToBottom = () => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
+  }
+
+  useEffect(() => {
+    scrollToBottom()
+  }, [messages, streamingContent])
 
   // 解析命令
   const parseCommand = useCallback((text: string): { isCommand: boolean; command?: Command; args: string } => {
@@ -129,7 +238,8 @@ function ChatArea({ tool }: ChatAreaProps): JSX.Element {
           Modal.info({
             title: '可用模型',
             content: <pre style={{ whiteSpace: 'pre-wrap', margin: 0 }}>{modelList || '暂无已配置的模型'}</pre>,
-            width: 400
+            width: 400,
+            centered: true
           })
         } catch (error) {
           message.error('获取模型列表失败')
@@ -153,38 +263,8 @@ function ChatArea({ tool }: ChatAreaProps): JSX.Element {
     }
   }, [modelOptions])
 
-  // 加载模型列表
-  useEffect(() => {
-    const loadModels = async () => {
-      try {
-        const models = await window.api.ai.listModels()
-        // 只显示已配置的模型
-        const configuredModels = models.filter((m: any) => m.configured)
-        const options = configuredModels.map((m: any) => ({
-          value: m.id,
-          label: m.name
-        }))
-        setModelOptions(options)
-        if (options.length > 0 && !options.find(o => o.value === model)) {
-          setModel(options[0].value)
-        }
-      } catch (error) {
-        console.error('Load models error:', error)
-      }
-    }
-    loadModels()
-  }, [])
-
-  const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
-  }
-
-  useEffect(() => {
-    scrollToBottom()
-  }, [messages])
-
   const handleSend = async () => {
-    if (!input.trim() || loading) return
+    if (!input.trim() || loading || !sessionId) return
 
     const trimmedInput = input.trim()
 
@@ -192,14 +272,12 @@ function ChatArea({ tool }: ChatAreaProps): JSX.Element {
     const { isCommand, command, args } = parseCommand(trimmedInput)
 
     if (isCommand && command) {
-      // 执行命令
       await executeCommand(command, args)
       setInput('')
       return
     }
 
     if (isCommand) {
-      // 未知命令
       const errorMessage: Message = {
         id: Date.now().toString(),
         role: 'assistant',
@@ -218,25 +296,62 @@ function ChatArea({ tool }: ChatAreaProps): JSX.Element {
       timestamp: Date.now()
     }
 
+    // 保存用户消息
+    try {
+      await window.api.message.add(sessionId, {
+        id: userMessage.id,
+        role: 'user',
+        content: trimmedInput,
+        createdAt: new Date().toISOString()
+      })
+      // 更新会话标题（如果是第一条消息）
+      if (messages.length === 0) {
+        const title = trimmedInput.slice(0, 30) + (trimmedInput.length > 30 ? '...' : '')
+        await window.api.session.update(sessionId, { title })
+        onSessionUpdate?.()
+      }
+    } catch (e) {
+      console.error('Save user message error:', e)
+    }
+
     setMessages((prev) => [...prev, userMessage])
     setInput('')
     setLoading(true)
+    setStreamingContent('')
 
     try {
+      const messagesWithTime = messages.concat(userMessage).map((m) => {
+        if (m.role === 'user') {
+          return {
+            role: m.role,
+            content: enhanceWithCurrentTime(m.content)
+          }
+        }
+        return { role: m.role, content: m.content }
+      })
+
       const response = await window.api.ai.chat(
-        messages.concat(userMessage).map((m) => ({
-          role: m.role,
-          content: m.content
-        })),
-        { model }
+        messagesWithTime,
+        { model, useTools: true }
       ) as { content: string }
-      console.log('111111', response)
 
       const assistantMessage: Message = {
         id: (Date.now() + 1).toString(),
         role: 'assistant',
         content: response.content || '你好，我是 AI 助手 Seven，有什么可以帮助你的吗？',
         timestamp: Date.now()
+      }
+
+      // 保存助手回复
+      try {
+        await window.api.message.add(sessionId, {
+          id: assistantMessage.id,
+          role: 'assistant',
+          content: assistantMessage.content,
+          createdAt: new Date().toISOString()
+        })
+      } catch (e) {
+        console.error('Save assistant message error:', e)
       }
 
       setMessages((prev) => [...prev, assistantMessage])
@@ -251,6 +366,25 @@ function ChatArea({ tool }: ChatAreaProps): JSX.Element {
       setMessages((prev) => [...prev, errorMessage])
     } finally {
       setLoading(false)
+      setStreamingContent('')
+    }
+  }
+
+  // 清除对话
+  const handleClear = async () => {
+    if (!sessionId) return
+    try {
+      // 删除所有消息
+      const sessionData = await window.api.session.get(sessionId)
+      if (sessionData?.messages) {
+        for (const msg of sessionData.messages) {
+          await window.api.message.delete(sessionId, msg.id)
+        }
+      }
+      setMessages([])
+      message.success('对话已清除')
+    } catch (error) {
+      console.error('Clear error:', error)
     }
   }
 
@@ -264,27 +398,55 @@ function ChatArea({ tool }: ChatAreaProps): JSX.Element {
 
   return (
     <div className="chat-area">
+      {/* 聊天头部 */}
       <div className="chat-header">
-        <Select
-          value={model}
-          onChange={setModel}
-          style={{ width: 140 }}
-          size="small"
-          options={modelOptions}
-        />
+        <div className="chat-header-left">
+          <span className="chat-title">
+            <span className="gradient-text">AI</span> 对话
+          </span>
+                    <Select
+            value={model}
+            onChange={setModel}
+            style={{ width: 160 }}
+            size="small"
+            options={modelOptions}
+            popupClassName="model-select-dropdown"
+          />
+        </div>
+        <div className="chat-header-right">
+          <Tooltip title="清除对话">
+            <Button 
+              type="text" 
+              icon={<DeleteOutlined />} 
+              onClick={handleClear}
+              className="header-btn"
+            />
+          </Tooltip>
+        </div>
       </div>
 
+      {/* 消息区域 - 可滚动 */}
       <div className="chat-messages">
         {messages.length === 0 ? (
           <div className="chat-welcome">
-            <RobotOutlined style={{ fontSize: 56, color: '#007aff' }} />
-            <h2>你好，我是 Seven</h2>
+            <div className="welcome-icon">
+              <RobotOutlined />
+            </div>
+            <h2>你好，我是 <span className="gradient-text">Seven</span></h2>
             <p>选择一个模型，开始对话吧</p>
-            <p className="chat-hint">输入 /help 查看可用命令</p>
+            <div className="welcome-commands">
+              <span className="command-tag">/help</span>
+              <span className="command-tag">/clear</span>
+              <span className="command-tag">/models</span>
+            </div>
           </div>
         ) : (
-          messages.map((msg) => (
-            <div key={msg.id} className={`message message-${msg.role}`}>
+          messages.map((msg, index) => (
+            <div 
+              key={msg.id} 
+              className={`message message-${msg.role}`}
+              style={{ animationDelay: `${index * 0.05}s` }}
+            >
               <div className="message-avatar">
                 {msg.role === 'user' ? <UserOutlined /> : <RobotOutlined />}
               </div>
@@ -295,261 +457,500 @@ function ChatArea({ tool }: ChatAreaProps): JSX.Element {
           ))
         )}
         {loading && (
-          <div className="message message-assistant">
+          <div className="message message-assistant loading">
             <div className="message-avatar">
               <RobotOutlined />
             </div>
             <div className="message-content">
-              <Spin size="small" />
+              <div className="message-text typing">
+                <span className="typing-dot"></span>
+                <span className="typing-dot"></span>
+                <span className="typing-dot"></span>
+              </div>
             </div>
           </div>
         )}
         <div ref={messagesEndRef} />
       </div>
 
-      <div className="chat-input">
-        <TextArea
-          value={input}
-          onChange={(e) => {
-            const value = e.target.value
-            setInput(value)
-            // 自动补全
-            const hints = getCommandHints(value)
-            setCommandHints(hints)
-            setShowCommandHint(hints.length > 0 && value.startsWith('/'))
-            setSelectedHintIndex(0)
-          }}
-          onPressEnter={(e) => {
-            if (showCommandHint && commandHints.length > 0) {
-              e.preventDefault()
-              const selected = commandHints[selectedHintIndex]
-              setInput('/' + selected.name + ' ')
-              setShowCommandHint(false)
-              return
-            }
-            if (!e.shiftKey) {
-              e.preventDefault()
-              handleSend()
-            }
-          }}
-          onKeyDown={(e) => {
-            if (showCommandHint && commandHints.length > 0) {
-              if (e.key === 'ArrowDown') {
-                e.preventDefault()
-                setSelectedHintIndex(prev => (prev + 1) % commandHints.length)
-              } else if (e.key === 'ArrowUp') {
-                e.preventDefault()
-                setSelectedHintIndex(prev => (prev - 1 + commandHints.length) % commandHints.length)
-              } else if (e.key === 'Escape') {
-                setShowCommandHint(false)
-              }
-            }
-          }}
-          placeholder="发送消息... (输入 /help 查看命令)"
-          autoSize={{ minRows: 1, maxRows: 4 }}
-          disabled={loading}
-        />
-        {showCommandHint && commandHints.length > 0 && (
-          <div className="command-hints">
-            {commandHints.map((cmd, index) => (
-              <div
-                key={cmd.name}
-                className={`command-hint-item ${index === selectedHintIndex ? 'selected' : ''}`}
-                onClick={() => {
-                  setInput('/' + cmd.name + ' ')
+      {/* 输入区域 - 居中显示 */}
+      <div className="chat-input-container">
+        <div className="chat-input-wrapper-centered">
+          <div className="chat-input">
+            <TextArea
+              value={input}
+              onChange={(e) => {
+                const value = e.target.value
+                setInput(value)
+                const hints = getCommandHints(value)
+                setCommandHints(hints)
+                setShowCommandHint(hints.length > 0 && value.startsWith('/'))
+                setSelectedHintIndex(0)
+              }}
+              onPressEnter={(e) => {
+                if (showCommandHint && commandHints.length > 0) {
+                  e.preventDefault()
+                  const selected = commandHints[selectedHintIndex]
+                  setInput('/' + selected.name + ' ')
                   setShowCommandHint(false)
-                }}
-              >
-                <span className="command-usage">{cmd.usage}</span>
-                <span className="command-desc">{cmd.description}</span>
-              </div>
-            ))}
+                  return
+                }
+                if (!e.shiftKey) {
+                  e.preventDefault()
+                  handleSend()
+                }
+              }}
+              onKeyDown={(e) => {
+                if (showCommandHint && commandHints.length > 0) {
+                  if (e.key === 'ArrowDown') {
+                    e.preventDefault()
+                    setSelectedHintIndex(prev => (prev + 1) % commandHints.length)
+                  } else if (e.key === 'ArrowUp') {
+                    e.preventDefault()
+                    setSelectedHintIndex(prev => (prev - 1 + commandHints.length) % commandHints.length)
+                  } else if (e.key === 'Escape') {
+                    setShowCommandHint(false)
+                  }
+                }
+              }}
+              placeholder="发送消息... (输入 / 查看命令)"
+              autoSize={{ minRows: 1, maxRows: 4 }}
+              disabled={loading}
+              className="chat-textarea"
+            />
+            <Button
+              type="primary"
+              shape="circle"
+              icon={loading ? <LoadingOutlined /> : <SendOutlined />}
+              onClick={handleSend}
+              loading={loading}
+              disabled={!input.trim() || !sessionId}
+              className="send-btn"
+            />
           </div>
-        )}
-        <Button
-          type="primary"
-          shape="circle"
-          icon={<SendOutlined />}
-          onClick={handleSend}
-          loading={loading}
-          disabled={!input.trim()}
-        />
+          
+          {/* 命令提示 */}
+          {showCommandHint && commandHints.length > 0 && (
+            <div className="command-hints">
+              {commandHints.map((cmd, index) => (
+                <div
+                  key={cmd.name}
+                  className={`command-hint-item ${index === selectedHintIndex ? 'selected' : ''}`}
+                  onClick={() => {
+                    setInput('/' + cmd.name + ' ')
+                    setShowCommandHint(false)
+                  }}
+                >
+                  <span className="command-usage">{cmd.usage}</span>
+                  <span className="command-desc">{cmd.description}</span>
+                </div>
+              ))}
+            </div>
+          )}
+
+          <div className="input-footer">
+            <span className="input-hint">Shift + Enter 换行，Enter 发送</span>
+          </div>
+        </div>
       </div>
 
       <style>{`
         .chat-area {
-        }
-        .command-hints {
-          position: absolute;
-          bottom: 100%;
-          left: 0;
-          right: 0;
-          background: white;
-          border: 1px solid #d9d9d9;
-          border-radius: 8px;
-          box-shadow: 0 4px 12px rgba(0,0,0,0.15);
-          max-height: 200px;
-          overflow-y: auto;
-          z-index: 100;
-          margin-bottom: 8px;
-        }
-        .command-hint-item {
-          display: flex;
-          justify-content: space-between;
-          padding: 10px 16px;
-          cursor: pointer;
-          transition: background 0.2s;
-        }
-        .command-hint-item:hover, .command-hint-item.selected {
-          background: #f5f5f5;
-        }
-        .command-hint-item:first-child {
-          border-radius: 8px 8px 0 0;
-        }
-        .command-hint-item:last-child {
-          border-radius: 0 0 8px 8px;
-        }
-        .command-usage {
-          font-weight: 500;
-          color: #1890ff;
-        }
-        .command-desc {
-          color: #888;
-          font-size: 12px;
-        }
-        .chat-area {
           display: flex;
           flex-direction: column;
           height: 100%;
-          background: #f2f2f7;
+          background: var(--bg-primary);
+          position: relative;
         }
+
         .chat-area-placeholder {
           display: flex;
           align-items: center;
           justify-content: center;
           height: 100%;
-          background: #f2f2f7;
+          background: var(--bg-primary);
         }
+
+        /* 头部 */
         .chat-header {
-          padding: 12px 16px;
-          background: rgba(242, 242, 247, 0.8);
-          backdrop-filter: blur(20px);
-          -webkit-backdrop-filter: blur(20px);
-          border-bottom: 0.5px solid rgba(0, 0, 0, 0.1);
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          padding: 12px 20px;
+          background: var(--bg-secondary);
+          border-bottom: 1px solid var(--border-subtle);
+          flex-shrink: 0;
+          z-index: 10;
         }
+
+        .chat-header-left, .chat-header-right {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+        }
+
+        .chat-title {
+          font-size: 16px;
+          font-weight: 600;
+          color: var(--text-primary);
+        }
+
+        .header-btn {
+          color: var(--text-muted) !important;
+        }
+
+        .header-btn:hover {
+          color: var(--text-primary) !important;
+          background: var(--bg-tertiary) !important;
+        }
+
+        /* 消息区域 */
         .chat-messages {
           flex: 1;
           overflow-y: auto;
-          padding: 16px;
-          padding-bottom: 8px;
+          padding: 20px;
+          display: flex;
+          flex-direction: column;
+          gap: 16px;
+          padding-bottom: 200px;
         }
+
+        /* 欢迎页 */
         .chat-welcome {
           display: flex;
           flex-direction: column;
           align-items: center;
           justify-content: center;
           height: 100%;
-          color: #8e8e93;
+          min-height: 300px;
+          text-align: center;
+          animation: fadeIn 0.5s ease;
         }
+
+        .welcome-icon {
+          width: 80px;
+          height: 80px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          background: var(--gradient-primary);
+          border-radius: 24px;
+          font-size: 36px;
+          color: white;
+          margin-bottom: 24px;
+          box-shadow: 0 8px 32px rgba(99, 102, 241, 0.3);
+          animation: breathe 3s ease-in-out infinite;
+        }
+
+        @keyframes breathe {
+          0%, 100% { 
+            box-shadow: 0 8px 32px rgba(99, 102, 241, 0.3);
+          }
+          50% { 
+            box-shadow: 0 8px 48px rgba(99, 102, 241, 0.5);
+          }
+        }
+
         .chat-welcome h2 {
-          margin: 16px 0 8px;
-          font-size: 20px;
+          font-size: 28px;
           font-weight: 600;
-          color: #000;
+          color: var(--text-primary);
+          margin-bottom: 8px;
         }
+
         .chat-welcome p {
           font-size: 15px;
+          color: var(--text-muted);
+          margin-bottom: 24px;
         }
-        .chat-hint {
-          margin-top: 16px;
+
+        .welcome-commands {
+          display: flex;
+          gap: 8px;
+        }
+
+        .command-tag {
+          padding: 6px 14px;
+          background: var(--bg-tertiary);
+          border: 1px solid var(--border-default);
+          border-radius: 20px;
           font-size: 13px;
-          color: #007aff;
+          color: var(--text-secondary);
+          font-family: monospace;
         }
+
+        /* 消息气泡 */
         .message {
           display: flex;
-          margin-bottom: 12px;
-          animation: fadeIn 0.3s ease;
+          gap: 12px;
+          max-width: 85%;
+          animation: slideUp 0.3s ease forwards;
+          opacity: 0;
         }
-        @keyframes fadeIn {
-          from { opacity: 0; transform: translateY(10px); }
-          to { opacity: 1; transform: translateY(0); }
-        }
+
         .message-user {
+          align-self: flex-end;
           flex-direction: row-reverse;
         }
+
         .message-avatar {
-          width: 32px;
-          height: 32px;
-          border-radius: 50%;
+          width: 36px;
+          height: 36px;
+          border-radius: 12px;
           display: flex;
           align-items: center;
           justify-content: center;
           flex-shrink: 0;
-          font-size: 14px;
+          font-size: 16px;
         }
+
         .message-user .message-avatar {
-          background: #007aff;
-          color: #fff;
+          background: var(--gradient-primary);
+          color: white;
+          box-shadow: 0 4px 12px rgba(99, 102, 241, 0.3);
         }
+
         .message-assistant .message-avatar {
-          background: #34c759;
-          color: #fff;
+          background: var(--bg-tertiary);
+          color: var(--primary-light);
+          border: 1px solid var(--border-default);
         }
+
         .message-content {
-          max-width: 75%;
-          margin: 0 8px;
-        }
-        .message-user .message-content {
           display: flex;
-          justify-content: flex-end;
+          flex-direction: column;
         }
+
         .message-text {
-          padding: 10px 14px;
-          border-radius: 18px;
-          background: #fff;
+          padding: 12px 16px;
+          border-radius: 16px;
+          background: var(--bg-secondary);
+          border: 1px solid var(--border-subtle);
           white-space: pre-wrap;
           word-break: break-word;
-          font-size: 15px;
-          line-height: 1.4;
-          box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+          font-size: 14px;
+          line-height: 1.6;
+          color: var(--text-primary);
         }
+
         .message-user .message-text {
-          background: #007aff;
-          color: #fff;
+          background: var(--gradient-primary);
+          color: white;
+          border: none;
           border-bottom-right-radius: 4px;
+          box-shadow: 0 4px 12px rgba(99, 102, 241, 0.3);
         }
+
         .message-assistant .message-text {
           border-bottom-left-radius: 4px;
         }
+
+        /* 加载动画 */
+        .message.loading .message-text {
+          display: flex;
+          align-items: center;
+          gap: 4px;
+          padding: 12px 20px;
+        }
+
+        .typing-dot {
+          width: 6px;
+          height: 6px;
+          background: var(--primary-light);
+          border-radius: 50%;
+          animation: typing 1.4s ease-in-out infinite;
+        }
+
+        .typing-dot:nth-child(2) {
+          animation-delay: 0.2s;
+        }
+
+        .typing-dot:nth-child(3) {
+          animation-delay: 0.4s;
+        }
+
+        @keyframes typing {
+          0%, 60%, 100% {
+            transform: translateY(0);
+            opacity: 0.4;
+          }
+          30% {
+            transform: translateY(-4px);
+            opacity: 1;
+          }
+        }
+
+        /* 输入区域容器 - 居中定位 */
+        .chat-input-container {
+          position: absolute;
+          bottom: 0;
+          left: 0;
+          right: 0;
+          display: flex;
+          justify-content: center;
+          padding: 16px 20px;
+          padding-bottom: calc(24px + env(safe-area-inset-bottom));
+          background: linear-gradient(to top, var(--bg-primary) 60%, transparent);
+          z-index: 100;
+        }
+
+        .chat-input-wrapper-centered {
+          width: 100%;
+          max-width: 800px;
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+        }
+
         .chat-input {
           display: flex;
-          align-items: flex-end;
-          gap: 8px;
-          padding: 8px 12px;
-          padding-bottom: calc(8px + env(safe-area-inset-bottom));
-          background: rgba(255, 255, 255, 0.94);
-          backdrop-filter: blur(20px);
-          -webkit-backdrop-filter: blur(20px);
-          border-top: 0.5px solid rgba(0, 0, 0, 0.1);
-          position: relative;
+          align-items: center;
+          gap: 12px;
+          padding: 8px;
+          background: var(--bg-secondary);
+          border: 1px solid var(--border-default);
+          border-radius: 16px;
+          transition: var(--transition-fast);
+          width: 100%;
+          box-shadow: 0 -4px 24px rgba(0, 0, 0, 0.3);
         }
-        .chat-input textarea {
+
+        .chat-input:focus-within {
+          border-color: var(--primary);
+          box-shadow: 0 -4px 24px rgba(0, 0, 0, 0.3), 0 0 0 3px rgba(99, 102, 241, 0.15);
+        }
+
+        /* 内联模型选择器 */
+        .model-select-inline {
+          width: 130px;
+          flex-shrink: 0;
+        }
+
+        .model-select-inline .ant-select-selector {
+          background: var(--bg-tertiary) !important;
+          border: 1px solid var(--border-subtle) !important;
+          border-radius: 10px !important;
+          height: 36px !important;
+          padding: 4px 8px !important;
+        }
+
+        .model-select-inline .ant-select-selection-item {
+          line-height: 26px !important;
+          color: var(--text-primary);
+          font-weight: 500;
+        }
+
+        .model-select-inline:hover .ant-select-selector {
+          border-color: var(--primary) !important;
+        }
+
+        .model-select-inline.ant-select-focused .ant-select-selector {
+          border-color: var(--primary) !important;
+          box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.15) !important;
+        }
+
+        .chat-textarea {
           flex: 1;
-          border-radius: 20px;
-          padding: 10px 16px;
-          font-size: 15px;
-          border: none;
-          background: #f2f2f7;
+          border: none !important;
+          background: transparent !important;
           resize: none;
+          font-size: 14px;
+          line-height: 1.5;
         }
-        .chat-input textarea:focus {
-          box-shadow: none;
-          border: none;
+
+        .chat-textarea:focus {
+          box-shadow: none !important;
         }
-        .chat-input .ant-btn-primary {
-          width: 36px;
-          height: 36px;
-          box-shadow: 0 2px 8px rgba(0, 122, 255, 0.3);
+
+        .send-btn {
+          width: 40px !important;
+          height: 40px !important;
+          flex-shrink: 0;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+        }
+
+        /* 命令提示 */
+        .command-hints {
+          background: var(--bg-elevated);
+          border: 1px solid var(--border-default);
+          border-radius: 12px;
+          box-shadow: var(--shadow-lg);
+          max-height: 200px;
+          overflow-y: auto;
+          margin-bottom: 8px;
+          width: 100%;
+          max-width: 800px;
+          margin-top: 8px;
+        }
+
+        .command-hint-item {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          padding: 12px 16px;
+          cursor: pointer;
+          transition: var(--transition-fast);
+        }
+
+        .command-hint-item:hover, .command-hint-item.selected {
+          background: var(--bg-tertiary);
+        }
+
+        .command-hint-item:first-child {
+          border-radius: 12px 12px 0 0;
+        }
+
+        .command-hint-item:last-child {
+          border-radius: 0 0 12px 12px;
+        }
+
+        .command-usage {
+          font-weight: 500;
+          color: var(--primary-light);
+          font-family: monospace;
+        }
+
+        .command-desc {
+          color: var(--text-muted);
+          font-size: 12px;
+        }
+
+        /* 输入框底部 */
+        .input-footer {
+          display: flex;
+          justify-content: center;
+          margin-top: 8px;
+        }
+
+        .input-hint {
+          font-size: 11px;
+          color: var(--text-muted);
+        }
+
+        /* 模型选择下拉框 */
+        .model-select-dropdown {
+          background: var(--bg-elevated) !important;
+          border: 1px solid var(--border-default) !important;
+        }
+
+        /* 滚动条样式 */
+        .chat-messages::-webkit-scrollbar {
+          width: 6px;
+        }
+
+        .chat-messages::-webkit-scrollbar-track {
+          background: transparent;
+        }
+
+        .chat-messages::-webkit-scrollbar-thumb {
+          background: var(--border-default);
+          border-radius: 3px;
+        }
+
+        .chat-messages::-webkit-scrollbar-thumb:hover {
+          background: var(--primary);
         }
       `}</style>
     </div>

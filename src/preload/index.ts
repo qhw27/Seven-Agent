@@ -9,6 +9,21 @@ const api = {
     get: (sql: string, params?: unknown[]) => ipcRenderer.invoke('db:get', sql, params),
     all: (sql: string, params?: unknown[]) => ipcRenderer.invoke('db:all', sql, params)
   },
+  // 会话操作
+  session: {
+    create: (sessionData: any) => ipcRenderer.invoke('db-create-session', sessionData),
+    get: (sessionId: string) => ipcRenderer.invoke('db-get-session', sessionId),
+    getList: (page?: number, pageSize?: number) => ipcRenderer.invoke('db-get-session-list', page, pageSize),
+    search: (keyword?: string) => ipcRenderer.invoke('db-search-sessions', keyword),
+    update: (sessionId: string, data: { title?: string }) => ipcRenderer.invoke('db-update-session-title', sessionId, data.title || ''),
+    delete: (sessionId: string) => ipcRenderer.invoke('db-delete-session', sessionId),
+    getMetadata: (sessionId: string) => ipcRenderer.invoke('db-get-session-metadata', sessionId)
+  },
+  // 消息操作
+  message: {
+    add: (sessionId: string, messageData: any) => ipcRenderer.invoke('db-add-message', sessionId, messageData),
+    delete: (messageId: string) => ipcRenderer.invoke('db-delete-message', messageId)
+  },
   // AI 模型操作
   ai: {
     chat: (messages: unknown[], options?: { model?: string }) => ipcRenderer.invoke('ai:chat', messages, options),

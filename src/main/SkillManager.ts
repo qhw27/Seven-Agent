@@ -31,7 +31,7 @@ const SKILLHUB_API = 'https://skillhub-1388575217.cos.ap-guangzhou.myqcloud.com'
 
 // 超时配置
 const SKILL_DOWNLOAD_TIMEOUT = 600000; // 10分钟
-const HTTP_REQUEST_TIMEOUT = 30000;
+const HTTP_REQUEST_TIMEOUT = 300000;
 const EXECUTE_TIMEOUT = 60000;
 
 // 开发环境标志

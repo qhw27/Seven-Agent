@@ -1,10 +1,11 @@
 import { useState, useEffect } from 'react'
 import { Tooltip } from 'antd'
 import {
-  MinusSquareOutlined,
+  MinusOutlined,
   ExpandOutlined,
   CloseOutlined,
-  ReloadOutlined
+  ReloadOutlined,
+  DiscordOutlined
 } from '@ant-design/icons'
 
 function TitleBar(): JSX.Element {
@@ -18,33 +19,28 @@ function TitleBar(): JSX.Element {
     window.api.window.onMaximizedChanged((_event, maximized) => {
       setIsMaximized(maximized)
     })
-
     return () => {
       window.api.window.offMaximizedChanged(() => {})
     }
   }, [])
 
-  const handleMinimize = () => {
-    window.api.window.minimize()
-  }
-
-  const handleMaximize = () => {
-    window.api.window.maximize()
-  }
-
-  const handleClose = () => {
-    window.api.window.close()
-  }
-
-  const handleRefresh = () => {
-    window.location.reload()
-  }
+  const handleMinimize = () => window.api.window.minimize()
+  const handleMaximize = () => window.api.window.maximize()
+  const handleClose = () => window.api.window.close()
+  const handleRefresh = () => window.location.reload()
 
   return (
     <div className="title-bar">
       <div className="title-bar-drag">
-        <span className="title-bar-title">Seven</span>
+        {/* Logo */}
+        <div className="title-bar-logo">
+          <div className="logo-icon">
+            <DiscordOutlined />
+          </div>
+          <span className="logo-text">Seven</span>
+        </div>
       </div>
+      
       <div className="title-bar-controls">
         <Tooltip title="刷新" placement="bottom">
           <button className="title-bar-btn" onClick={handleRefresh}>
@@ -53,12 +49,15 @@ function TitleBar(): JSX.Element {
         </Tooltip>
         <Tooltip title="最小化" placement="bottom">
           <button className="title-bar-btn" onClick={handleMinimize}>
-            <MinusSquareOutlined />
+            <MinusOutlined />
           </button>
         </Tooltip>
         <Tooltip title={isMaximized ? '还原' : '最大化'} placement="bottom">
           <button className="title-bar-btn" onClick={handleMaximize}>
-            <ExpandOutlined style={{ transform: isMaximized ? 'rotate(180deg)' : 'none' }} />
+            <ExpandOutlined style={{ 
+              transform: isMaximized ? 'rotate(180deg)' : 'none',
+              fontSize: 12
+            }} />
           </button>
         </Tooltip>
         <Tooltip title="关闭" placement="bottom">
@@ -67,36 +66,65 @@ function TitleBar(): JSX.Element {
           </button>
         </Tooltip>
       </div>
+
       <style>{`
         .title-bar {
           display: flex;
           align-items: center;
           justify-content: space-between;
-          height: 40px;
-          background: rgba(255, 255, 255, 0.85);
-          backdrop-filter: blur(20px);
-          -webkit-backdrop-filter: blur(20px);
-          border-bottom: 0.5px solid rgba(0, 0, 0, 0.08);
+          height: 48px;
+          background: var(--bg-secondary);
+          border-bottom: 1px solid var(--border-subtle);
           user-select: none;
+          -webkit-app-region: drag;
         }
+
         .title-bar-drag {
           flex: 1;
           height: 100%;
           display: flex;
           align-items: center;
-          padding-left: 16px;
-          -webkit-app-region: drag;
+          padding-left: 12px;
         }
-        .title-bar-title {
-          font-size: 13px;
-          font-weight: 600;
-          color: #000;
+
+        /* Logo 区域 */
+        .title-bar-logo {
+          display: flex;
+          align-items: center;
+          gap: 10px;
+          -webkit-app-region: no-drag;
         }
+
+        .logo-icon {
+          width: 28px;
+          height: 28px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          background: var(--gradient-primary);
+          border-radius: 8px;
+          font-size: 14px;
+          color: white;
+          box-shadow: 0 2px 8px rgba(99, 102, 241, 0.3);
+        }
+
+        .logo-text {
+          font-size: 15px;
+          font-weight: 700;
+          background: var(--gradient-primary);
+          -webkit-background-clip: text;
+          -webkit-text-fill-color: transparent;
+          background-clip: text;
+          letter-spacing: -0.5px;
+        }
+
+        /* 窗口控制按钮 */
         .title-bar-controls {
           display: flex;
           height: 100%;
           -webkit-app-region: no-drag;
         }
+
         .title-bar-btn {
           width: 46px;
           height: 100%;
@@ -106,16 +134,29 @@ function TitleBar(): JSX.Element {
           display: flex;
           align-items: center;
           justify-content: center;
-          font-size: 14px;
-          color: #000;
-          transition: background 0.15s;
+          font-size: 13px;
+          color: var(--text-secondary);
+          transition: var(--transition-fast);
         }
+
         .title-bar-btn:hover {
-          background: rgba(0, 0, 0, 0.06);
+          background: var(--bg-tertiary);
+          color: var(--text-primary);
         }
+
         .title-bar-btn-close:hover {
-          background: #e81123;
-          color: #fff;
+          background: var(--error);
+          color: white;
+        }
+
+        /* 最小化按钮动画 */
+        .title-bar-btn:nth-child(2):hover {
+          background: var(--bg-tertiary);
+        }
+
+        /* 最大化按钮 */
+        .title-bar-btn:nth-child(3):hover {
+          background: var(--bg-tertiary);
         }
       `}</style>
     </div>

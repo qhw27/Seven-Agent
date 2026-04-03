@@ -9,10 +9,23 @@ export default defineConfig({
     globals: true,
     setupFiles: ['./tests/setup.ts'],
     include: ['tests/**/*.test.ts', 'tests/**/*.test.tsx'],
+    // 解决 Electron main process 模块问题
+    external: ['electron'],
+    alias: {
+      '@': path.resolve(__dirname, './src'),
+      '@/main': path.resolve(__dirname, './src/main'),
+      '@/renderer': path.resolve(__dirname, './src/renderer'),
+      '@/preload': path.resolve(__dirname, './src/preload'),
+      '@/shared': path.resolve(__dirname, './src/shared'),
+    },
   },
   resolve: {
     alias: {
       '@': path.resolve(__dirname, './src'),
+      '@/main': path.resolve(__dirname, './src/main'),
+      '@/renderer': path.resolve(__dirname, './src/renderer'),
+      '@/preload': path.resolve(__dirname, './src/preload'),
+      '@/shared': path.resolve(__dirname, './src/shared'),
     },
   },
 })

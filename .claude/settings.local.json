@@ -29,7 +29,16 @@
       "Bash(xxd:*)",
       "Bash(awk NR==358:*)",
       "Bash(powershell:*)",
-      "mcp__ide__getDiagnostics"
+      "mcp__ide__getDiagnostics",
+      "Bash(awk:*)",
+      "Bash(npx tsc:*)",
+      "Bash(mkdir:*)",
+      "Bash(npx vitest:*)",
+      "Bash(mv:*)",
+      "Bash(ls:*)",
+      "Bash(npm test:*)",
+      "Bash(npm run:*)",
+      "Bash(cp:*)"
     ]
   }
 }

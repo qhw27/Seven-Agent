@@ -32,6 +32,19 @@ declare global {
         getPath: (name: string) => Promise<string>
         openExternal: (url: string) => Promise<void>
       }
+      session: {
+        create: (sessionData: any) => Promise<any>
+        get: (sessionId: string) => Promise<any>
+        getList: (page?: number, pageSize?: number) => Promise<any>
+        search: (keyword?: string) => Promise<any[]>
+        updateTitle: (sessionId: string, newTitle: string) => Promise<any>
+        delete: (sessionId: string) => Promise<any>
+        getMetadata: (sessionId: string) => Promise<any>
+      }
+      message: {
+        add: (sessionId: string, messageData: any) => Promise<any>
+        delete: (messageId: string) => Promise<any>
+      }
       window: {
         minimize: () => Promise<void>
         maximize: () => Promise<void>

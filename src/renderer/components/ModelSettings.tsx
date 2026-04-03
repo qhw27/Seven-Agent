@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { Card, Form, Input, Button, Select, message, Space, Tag, Modal, Tooltip } from 'antd'
-import { PlusOutlined, EditOutlined, DeleteOutlined, DesktopOutlined, CheckCircleFilled, SyncOutlined, ExportOutlined, ImportOutlined, GlobalOutlined } from '@ant-design/icons'
+import { PlusOutlined, EditOutlined, DeleteOutlined, DesktopOutlined, CheckCircleFilled, SyncOutlined, ExportOutlined, ImportOutlined, GlobalOutlined, RobotOutlined } from '@ant-design/icons'
 import { isLocalModel, API_KEY_GUIDES, PROVIDER_OPTIONS, PROVIDER_DEFAULTS } from '../../shared/model-config'
 
 
@@ -323,32 +323,36 @@ function ModelSettings(): JSX.Element {
   return (
     <div className="model-settings">
       <div className="model-settings-header">
-        <h2>模型管理</h2>
+        <div className="header-left">
+          <h2 className="settings-title">模型管理</h2>
+          <p className="settings-desc">配置 AI 模型的 API Key，选择当前使用的模型</p>
+        </div>
         <Space>
           <Tooltip title="导出配置">
-            <Button shape="circle" icon={<ExportOutlined />} onClick={exportConfig} />
+            <Button shape="circle" icon={<ExportOutlined />} onClick={exportConfig} className="header-btn" />
           </Tooltip>
           <Tooltip title="导入配置">
-            <Button shape="circle" icon={<ImportOutlined />} onClick={importConfig} />
+            <Button shape="circle" icon={<ImportOutlined />} onClick={importConfig} className="header-btn" />
           </Tooltip>
           <Button
             type="primary"
             shape="circle"
             icon={<PlusOutlined />}
             onClick={() => setShowAddModal(true)}
+            className="add-btn"
           />
         </Space>
       </div>
 
-      <p className="settings-desc">
-        配置 AI 模型的 API Key，选择当前使用的模型。
-      </p>
-
       {configuredModels.length === 0 ? (
         <div className="empty-state">
-          <DesktopOutlined style={{ fontSize: 48, color: '#c7c7cc', marginBottom: 12 }} />
-          <p>暂无已配置的模型</p>
-          <Button type="primary" onClick={() => setShowAddModal(true)}>添加模型</Button>
+          <div className="empty-icon">
+            <RobotOutlined />
+          </div>
+          <p className="empty-text">暂无已配置的模型</p>
+          <Button type="primary" onClick={() => setShowAddModal(true)} className="empty-btn">
+            添加模型
+          </Button>
         </div>
       ) : (
         <div className="model-list">
@@ -365,7 +369,7 @@ function ModelSettings(): JSX.Element {
               <div className="model-info">
                 <div className="model-name">
                   <span>{model.name}</span>
-                  {activeModel === model.id && <Tag color="blue" style={{ marginLeft: 8 }}>使用中</Tag>}
+                  {activeModel === model.id && <Tag className="active-tag">使用中</Tag>}
                 </div>
                 <p className="model-provider">{PROVIDER_OPTIONS.find(p => p.value === model.provider)?.label || model.provider}</p>
               </div>
@@ -375,6 +379,7 @@ function ModelSettings(): JSX.Element {
                     type="text"
                     size="small"
                     icon={<EditOutlined />}
+                    className="action-btn"
                     onClick={(e) => {
                       e.stopPropagation()
                       setEditingModel(model)
@@ -394,6 +399,7 @@ function ModelSettings(): JSX.Element {
                     size="small"
                     danger
                     icon={<DeleteOutlined />}
+                    className="action-btn"
                     onClick={(e) => {
                       e.stopPropagation()
                       setDeletingModel(model)
@@ -406,11 +412,14 @@ function ModelSettings(): JSX.Element {
         </div>
       )}
 
-      <div className="section-title">API Key 获取</div>
+      <div className="section-title">
+        <span className="section-dot"></span>
+        API Key 获取
+      </div>
       <div className="api-guide">
         {API_KEY_GUIDES.map(item => (
           <div key={item.name} className="api-item" onClick={() => openUrl(item.url)}>
-            <span>{item.name}</span>
+            <span className="api-name">{item.name}</span>
             <span className="api-arrow">›</span>
           </div>
         ))}
@@ -426,7 +435,7 @@ function ModelSettings(): JSX.Element {
           setAvailableModels([])
         }}
         footer={null}
-        className="ios-modal"
+        className="theme-modal"
         width={640}
       >
         <div className="mode-switch">
@@ -556,7 +565,7 @@ function ModelSettings(): JSX.Element {
           setEditAvailableModels([])
         }}
         footer={null}
-        className="ios-modal"
+        className="theme-modal"
         width={640}
       >
         <Form form={editForm} layout="vertical" onFinish={handleUpdateModel}>
@@ -643,190 +652,336 @@ function ModelSettings(): JSX.Element {
         okText="删除"
         okButtonProps={{ danger: true }}
         confirmLoading={loading}
+        className="theme-modal"
       >
         <p>确定要删除模型 <strong>{deletingModel?.name}</strong> 吗？</p>
       </Modal>
 
       <style>{`
         .model-settings {
-          padding: 16px;
-          padding-bottom: calc(16px + env(safe-area-inset-bottom));
+          padding: 20px;
+          padding-bottom: calc(20px + env(safe-area-inset-bottom));
           height: 100%;
           overflow-y: auto;
         }
+
         .model-settings-header {
           display: flex;
           justify-content: space-between;
-          align-items: center;
-          margin-bottom: 8px;
+          align-items: flex-start;
+          margin-bottom: 24px;
         }
-        .model-settings-header h2 {
-          margin: 0;
+
+        .header-left {
+          flex: 1;
+        }
+
+        .settings-title {
           font-size: 28px;
           font-weight: 700;
-          color: #000;
+          background: var(--gradient-primary);
+          -webkit-background-clip: text;
+          -webkit-text-fill-color: transparent;
+          background-clip: text;
+          margin: 0 0 8px 0;
         }
+
         .settings-desc {
           font-size: 14px;
-          color: #8e8e93;
-          margin-bottom: 20px;
+          color: var(--text-muted);
+          margin: 0;
         }
+
+        .header-btn {
+          background: var(--bg-tertiary) !important;
+          border-color: var(--border-default) !important;
+          color: var(--text-secondary) !important;
+        }
+
+        .header-btn:hover {
+          border-color: var(--primary) !important;
+          color: var(--primary) !important;
+        }
+
+        .add-btn {
+          background: var(--gradient-primary) !important;
+          box-shadow: 0 4px 16px rgba(99, 102, 241, 0.4) !important;
+        }
+
         .empty-state {
           display: flex;
           flex-direction: column;
           align-items: center;
           justify-content: center;
           padding: 60px 20px;
-          background: #fff;
-          border-radius: 12px;
-          margin-bottom: 20px;
-        }
-        .empty-state p {
-          color: #8e8e93;
-          margin-bottom: 16px;
-        }
-        .model-list {
-          display: flex;
-          flex-direction: column;
-          gap: 1px;
-          background: rgba(0, 0, 0, 0.1);
-          border-radius: 12px;
-          overflow: hidden;
+          background: var(--bg-tertiary);
+          border-radius: var(--radius-lg);
           margin-bottom: 24px;
+          border: 1px dashed var(--border-default);
         }
-        .model-item {
-          display: flex;
-          align-items: center;
-          gap: 12px;
-          padding: 14px 16px;
-          background: #fff;
-          cursor: pointer;
-          transition: background 0.2s;
-        }
-        .model-item:active {
-          background: #f2f2f7;
-        }
-        .model-item.active {
-          background: #f0f7ff;
-        }
-        .model-icon {
-          width: 40px;
-          height: 40px;
-          border-radius: 10px;
-          background: linear-gradient(135deg, #5e5ce6 0%, #bf5af2 100%);
+
+        .empty-icon {
+          width: 80px;
+          height: 80px;
+          border-radius: var(--radius-lg);
+          background: var(--gradient-primary);
           display: flex;
           align-items: center;
           justify-content: center;
-          font-size: 18px;
+          font-size: 36px;
+          color: #fff;
+          margin-bottom: 20px;
+          opacity: 0.8;
+        }
+
+        .empty-text {
+          color: var(--text-muted);
+          margin-bottom: 20px;
+          font-size: 15px;
+        }
+
+        .empty-btn {
+          background: var(--gradient-primary) !important;
+          box-shadow: 0 4px 16px rgba(99, 102, 241, 0.4) !important;
+        }
+
+        .model-list {
+          display: flex;
+          flex-direction: column;
+          gap: 12px;
+          margin-bottom: 32px;
+        }
+
+        .model-item {
+          display: flex;
+          align-items: center;
+          gap: 16px;
+          padding: 16px 20px;
+          background: var(--bg-tertiary);
+          border-radius: var(--radius-md);
+          border: 1px solid var(--border-subtle);
+          cursor: pointer;
+          transition: var(--transition-smooth);
+        }
+
+        .model-item:hover {
+          border-color: var(--border-default);
+          box-shadow: var(--shadow-sm);
+        }
+
+        .model-item.active {
+          border-color: var(--primary);
+          background: linear-gradient(135deg, rgba(99, 102, 241, 0.1) 0%, rgba(139, 92, 246, 0.1) 100%);
+        }
+
+        .model-icon {
+          width: 48px;
+          height: 48px;
+          border-radius: var(--radius-md);
+          background: var(--gradient-primary);
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          font-size: 20px;
           color: #fff;
           position: relative;
           flex-shrink: 0;
+          box-shadow: 0 4px 12px rgba(99, 102, 241, 0.3);
         }
+
         .check-icon {
           position: absolute;
-          bottom: -3px;
-          right: -3px;
-          font-size: 11px;
-          color: #34c759;
-          background: #fff;
+          bottom: -4px;
+          right: -4px;
+          font-size: 12px;
+          color: var(--success);
+          background: var(--bg-tertiary);
           border-radius: 50%;
+          padding: 2px;
         }
+
         .model-info {
           flex: 1;
           min-width: 0;
         }
+
         .model-name {
           display: flex;
           align-items: center;
           font-size: 16px;
-          font-weight: 500;
-          color: #000;
+          font-weight: 600;
+          color: var(--text-primary);
+          gap: 10px;
         }
+
+        .active-tag {
+          background: rgba(99, 102, 241, 0.2);
+          border: none;
+          color: var(--primary-light);
+          font-size: 11px;
+        }
+
         .model-provider {
-          margin: 2px 0 0;
+          margin: 4px 0 0;
           font-size: 13px;
-          color: #8e8e93;
+          color: var(--text-muted);
         }
+
         .model-actions {
           display: flex;
           gap: 4px;
-          opacity: 0.6;
         }
+
+        .action-btn {
+          color: var(--text-muted) !important;
+        }
+
+        .action-btn:hover {
+          color: var(--primary) !important;
+          background: rgba(99, 102, 241, 0.1) !important;
+        }
+
         .section-title {
           font-size: 13px;
           font-weight: 600;
-          color: #8e8e93;
+          color: var(--text-muted);
           text-transform: uppercase;
-          margin-bottom: 8px;
-          padding-left: 4px;
+          letter-spacing: 0.5px;
+          margin-bottom: 12px;
+          display: flex;
+          align-items: center;
+          gap: 8px;
         }
+
+        .section-dot {
+          width: 6px;
+          height: 6px;
+          border-radius: 50%;
+          background: var(--gradient-primary);
+        }
+
         .api-guide {
-          background: #fff;
-          border-radius: 12px;
+          background: var(--bg-tertiary);
+          border-radius: var(--radius-md);
           overflow: hidden;
+          border: 1px solid var(--border-subtle);
         }
+
         .api-item {
           display: flex;
           justify-content: space-between;
           align-items: center;
-          padding: 14px 16px;
-          border-bottom: 0.5px solid rgba(0, 0, 0, 0.1);
+          padding: 14px 18px;
+          border-bottom: 1px solid var(--border-subtle);
           cursor: pointer;
-          font-size: 15px;
-          color: #007aff;
+          font-size: 14px;
+          color: var(--text-secondary);
+          transition: var(--transition-smooth);
         }
+
         .api-item:last-child {
           border-bottom: none;
         }
-        .api-item:active {
-          background: #f2f2f7;
+
+        .api-item:hover {
+          background: var(--bg-elevated);
+          color: var(--primary);
         }
+
+        .api-name {
+          font-weight: 500;
+        }
+
         .api-arrow {
           font-size: 20px;
-          color: #c7c7cc;
+          color: var(--text-muted);
         }
+
         .mode-switch {
           display: flex;
-          background: #f2f2f7;
-          border-radius: 8px;
-          padding: 3px;
-          margin-bottom: 20px;
+          background: var(--bg-tertiary);
+          border-radius: var(--radius-md);
+          padding: 4px;
+          margin-bottom: 24px;
+          border: 1px solid var(--border-subtle);
         }
+
         .mode-btn {
           flex: 1;
           text-align: center;
-          padding: 8px 0;
-          border-radius: 6px;
+          padding: 10px 0;
+          border-radius: var(--radius-sm);
           font-size: 14px;
-          color: #8e8e93;
+          color: var(--text-muted);
           cursor: pointer;
-          transition: all 0.2s;
+          transition: var(--transition-smooth);
         }
+
         .mode-btn.active {
-          background: #fff;
-          color: #000;
+          background: var(--gradient-primary);
+          color: #fff;
           font-weight: 500;
-          box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+          box-shadow: 0 2px 8px rgba(99, 102, 241, 0.3);
         }
+
         .modal-footer {
           display: flex;
           justify-content: space-between;
           align-items: center;
-          margin-top: 20px;
-          padding-top: 16px;
-          border-top: 0.5px solid rgba(0, 0, 0, 0.1);
+          margin-top: 24px;
+          padding-top: 20px;
+          border-top: 1px solid var(--border-subtle);
         }
 
-        /* iOS Modal 样式 */
-        .ios-modal .ant-modal-content {
-          border-radius: 14px;
-          overflow: hidden;
+        /* Modal 样式 */
+        .theme-modal .ant-modal-content {
+          background: var(--bg-secondary) !important;
+          border: 1px solid var(--border-default) !important;
+          border-radius: var(--radius-lg) !important;
         }
-        .ios-modal .ant-modal-header {
-          border-bottom: 0.5px solid rgba(0, 0, 0, 0.1);
+
+        .theme-modal .ant-modal-header {
+          background: transparent !important;
+          border-bottom: 1px solid var(--border-subtle) !important;
+          padding: 20px 24px !important;
         }
-        .ios-modal .ant-modal-title {
-          font-weight: 600;
+
+        .theme-modal .ant-modal-title {
+          color: var(--text-primary) !important;
+          font-size: 18px !important;
+          font-weight: 600 !important;
+        }
+
+        .theme-modal .ant-modal-body {
+          padding: 24px !important;
+        }
+
+        .theme-modal .ant-modal-close {
+          color: var(--text-muted) !important;
+        }
+
+        .theme-modal .ant-modal-close:hover {
+          color: var(--text-primary) !important;
+        }
+
+        /* Form 样式 */
+        .theme-modal .ant-form-item-label > label {
+          color: var(--text-secondary) !important;
+        }
+
+        .theme-modal .ant-input,
+        .theme-modal .ant-input-affix-wrapper,
+        .theme-modal .ant-select-selector {
+          background: var(--bg-tertiary) !important;
+          border-color: var(--border-default) !important;
+          border-radius: var(--radius-sm) !important;
+        }
+
+        .theme-modal .ant-input:focus,
+        .theme-modal .ant-input-affix-wrapper:focus,
+        .theme-modal .ant-select-focused .ant-select-selector {
+          border-color: var(--primary) !important;
+          box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.2) !important;
         }
       `}</style>
     </div>

@@ -27,7 +27,41 @@ function getProxyConfig() {
 export interface ChatMessage {
   role: 'user' | 'assistant' | 'system'
   content: string
+  tool_calls?: ToolCall[]
+  tool_call_id?: string
 }
+
+// 工具定义
+export interface Tool {
+  type: 'function'
+  function: {
+    name: string
+    description: string
+    parameters: {
+      type: 'object'
+      properties: Record<string, unknown>
+      required?: string[]
+    }
+  }
+}
+
+// 工具调用格式
+export interface ToolCall {
+  id: string
+  type: 'function'
+  function: {
+    name: string
+    arguments: string
+  }
+}
+
+export interface ToolCallResult {
+  tool_call_id: string
+  content: string
+}
+
+// 工具执行器类型
+type ToolExecutor = (name: string, args: string) => Promise<string>
 
 // ========== 修复：使用文件存储替代 localStorage ==========
 const STORAGE_KEY = 'sevenclaw-model-config-store';
@@ -87,14 +121,14 @@ function getEndpoint(config: ModelConfig): string {
   return config.baseURL || (config as any).endpoint || '';
 }
 
-// AI 提供者接口
+// AI 提供者接口 (支持工具调用)
 interface AIProvider {
-  chat(messages: ChatMessage[], config: ModelConfig): Promise<string>
+  chat(messages: ChatMessage[], config: ModelConfig, tools?: Tool[]): Promise<{ content: string; toolCalls?: ToolCall[] }>
 }
 
 // 通义千问 (阿里云)
 class QwenProvider implements AIProvider {
-  async chat(messages: ChatMessage[], config: ModelConfig): Promise<string> {
+  async chat(messages: ChatMessage[], config: ModelConfig, tools?: Tool[]): Promise<{ content: string; toolCalls?: ToolCall[] }> {
     const endpoint = getEndpoint(config) || 'https://dashscope.aliyuncs.com/compatible-mode/v1'
     const url = `${endpoint}/chat/completions`
 
@@ -109,19 +143,30 @@ class QwenProvider implements AIProvider {
       axiosConfig.proxy = proxy
     }
 
-    const response = await axios.post(url, {
+    const requestBody: any = {
       model: getModelName(config) || 'qwen-turbo',
-      messages: messages.filter(m => m.role !== 'system'),
+      messages: messages,
       temperature: 0.7
-    }, axiosConfig)
+    }
 
-    return response.data.choices[0]?.message?.content || ''
+    // 添加工具支持
+    if (tools && tools.length > 0) {
+      requestBody.tools = tools
+    }
+
+    const response = await axios.post(url, requestBody, axiosConfig)
+
+    const message = response.data.choices[0]?.message
+    return {
+      content: message?.content || '',
+      toolCalls: message?.tool_calls
+    }
   }
 }
 
 // Kimi (月之暗面)
 class KimiProvider implements AIProvider {
-  async chat(messages: ChatMessage[], config: ModelConfig): Promise<string> {
+  async chat(messages: ChatMessage[], config: ModelConfig, tools?: Tool[]): Promise<{ content: string; toolCalls?: ToolCall[] }> {
     const endpoint = getEndpoint(config) || 'https://api.moonshot.cn/v1'
     const url = `${endpoint}/chat/completions`
 
@@ -136,19 +181,29 @@ class KimiProvider implements AIProvider {
       axiosConfig.proxy = proxy
     }
 
-    const response = await axios.post(url, {
+    const requestBody: any = {
       model: getModelName(config) || 'moonshot-v1-8k-vision-preview',
-      messages: messages.filter(m => m.role !== 'system'),
+      messages: messages,
       temperature: 0.7
-    }, axiosConfig)
+    }
 
-    return response.data.choices[0]?.message?.content || ''
+    if (tools && tools.length > 0) {
+      requestBody.tools = tools
+    }
+
+    const response = await axios.post(url, requestBody, axiosConfig)
+
+    const message = response.data.choices[0]?.message
+    return {
+      content: message?.content || '',
+      toolCalls: message?.tool_calls
+    }
   }
 }
 
 // MiniMax
 class MiniMaxProvider implements AIProvider {
-  async chat(messages: ChatMessage[], config: ModelConfig): Promise<string> {
+  async chat(messages: ChatMessage[], config: ModelConfig, tools?: Tool[]): Promise<{ content: string; toolCalls?: ToolCall[] }> {
     const endpoint = getEndpoint(config) || 'https://api.minimax.chat/v1'
     // 内部 API 使用 /chat/completions，外部 API 使用 /text/chatcompletion_v2
     const isInternal = endpoint.includes('172.17.124.34') || endpoint.includes('localhost')
@@ -166,39 +221,44 @@ class MiniMaxProvider implements AIProvider {
         'Authorization': `Bearer ${config.apiKey}`,
         'Content-Type': 'application/json'
       },
-      timeout: 30000
+      timeout: 3000000
     }
     if (proxy) {
       axiosConfig.proxy = proxy
     }
 
-    const requestBody = {
+    const requestBody: any = {
       model: getModelName(config) || 'minimax-m2.5',
-      messages: messages.filter(m => m.role !== 'system'),
+      messages: messages,
       temperature: 0.7
+    }
+
+    if (tools && tools.length > 0) {
+      requestBody.tools = tools
     }
 
     const response = await axios.post(url, requestBody, axiosConfig)
 
     console.log('[MiniMax] Response status:', response.status)
     console.log('[MiniMax] Response keys:', Object.keys(response.data))
-    console.log('[MiniMax] Response data:', JSON.stringify(response.data))
 
-    // 直接返回 content，不管其他字段
-    const content = response.data.choices?.[0]?.message?.content ||
+    const message = response.data.choices?.[0]?.message
+    const content = message?.content ||
                     response.data.choices?.[0]?.content ||
                     response.data.text ||
-                    response.data.message?.content ||
+                    message?.content ||
                     ''
 
-    console.log('[MiniMax] Extracted content:', content.substring(0, 100))
-    return content
+    return {
+      content,
+      toolCalls: message?.tool_calls
+    }
   }
 }
 
 // DeepSeek
 class DeepSeekProvider implements AIProvider {
-  async chat(messages: ChatMessage[], config: ModelConfig): Promise<string> {
+  async chat(messages: ChatMessage[], config: ModelConfig, tools?: Tool[]): Promise<{ content: string; toolCalls?: ToolCall[] }> {
     const endpoint = getEndpoint(config) || 'https://api.deepseek.com/v1'
     const url = `${endpoint}/chat/completions`
 
@@ -213,19 +273,29 @@ class DeepSeekProvider implements AIProvider {
       axiosConfig.proxy = proxy
     }
 
-    const response = await axios.post(url, {
+    const requestBody: any = {
       model: getModelName(config) || 'deepseek-chat',
-      messages: messages.filter(m => m.role !== 'system'),
+      messages: messages,
       temperature: 0.7
-    }, axiosConfig)
+    }
 
-    return response.data.choices[0]?.message?.content || ''
+    if (tools && tools.length > 0) {
+      requestBody.tools = tools
+    }
+
+    const response = await axios.post(url, requestBody, axiosConfig)
+
+    const message = response.data.choices[0]?.message
+    return {
+      content: message?.content || '',
+      toolCalls: message?.tool_calls
+    }
   }
 }
 
 // OpenAI
 class OpenAIProvider implements AIProvider {
-  async chat(messages: ChatMessage[], config: ModelConfig): Promise<string> {
+  async chat(messages: ChatMessage[], config: ModelConfig, tools?: Tool[]): Promise<{ content: string; toolCalls?: ToolCall[] }> {
     const endpoint = getEndpoint(config) || 'https://api.openai.com/v1'
     const url = `${endpoint}/chat/completions`
 
@@ -240,25 +310,37 @@ class OpenAIProvider implements AIProvider {
       axiosConfig.proxy = proxy
     }
 
-    const response = await axios.post(url, {
+    const requestBody: any = {
       model: getModelName(config) || 'gpt-4',
-      messages: messages.filter(m => m.role !== 'system'),
+      messages: messages,
       temperature: 0.7
-    }, axiosConfig)
+    }
 
-    return response.data.choices[0]?.message?.content || ''
+    if (tools && tools.length > 0) {
+      requestBody.tools = tools
+    }
+
+    const response = await axios.post(url, requestBody, axiosConfig)
+
+    const message = response.data.choices[0]?.message
+    return {
+      content: message?.content || '',
+      toolCalls: message?.tool_calls
+    }
   }
 }
 
 // Anthropic Claude
 class AnthropicProvider implements AIProvider {
-  async chat(messages: ChatMessage[], config: ModelConfig): Promise<string> {
+  async chat(messages: ChatMessage[], config: ModelConfig, tools?: Tool[]): Promise<{ content: string; toolCalls?: ToolCall[] }> {
     const endpoint = getEndpoint(config) || 'https://api.anthropic.com/v1'
     const url = `${endpoint}/messages`
 
     const convertedMessages = messages
-      .filter(m => m.role !== 'system')
-      .map(m => ({ role: m.role === 'assistant' ? 'assistant' : 'user', content: m.content }))
+      .map(m => ({ 
+        role: m.role === 'assistant' ? 'assistant' : (m.role === 'system' ? 'user' : 'user'), 
+        content: m.content 
+      }))
 
     const proxy = getProxyConfig()
     const axiosConfig: any = {
@@ -272,49 +354,70 @@ class AnthropicProvider implements AIProvider {
       axiosConfig.proxy = proxy
     }
 
-    const response = await axios.post(url, {
+    // Anthropic 使用 tools 字段而不是 tool_calls
+    const requestBody: any = {
       model: getModelName(config) || 'claude-3-5-sonnet-20241022',
       messages: convertedMessages,
       max_tokens: 4096
-    }, axiosConfig)
+    }
 
-    return response.data.content[0]?.text || ''
+    if (tools && tools.length > 0) {
+      requestBody.tools = tools
+    }
+
+    const response = await axios.post(url, requestBody, axiosConfig)
+
+    // Anthropic 返回的是 content 数组
+    const content = response.data.content?.[0]?.text || ''
+    return { content }
   }
 }
 
 // Ollama 本地模型
 class OllamaProvider implements AIProvider {
-  async chat(messages: ChatMessage[], config: ModelConfig): Promise<string> {
+  async chat(messages: ChatMessage[], config: ModelConfig, tools?: Tool[]): Promise<{ content: string; toolCalls?: ToolCall[] }> {
     const endpoint = getEndpoint(config) || 'http://localhost:11434'
     const url = `${endpoint}/api/chat`
 
     const response = await axios.post(url, {
       model: getModelName(config) || 'llama3.3',
-      messages: messages.filter(m => m.role !== 'system'),
+      messages: messages,
       stream: false
     })
 
-    return response.data.message?.content || ''
+    return {
+      content: response.data.message?.content || ''
+    }
   }
 }
 
 // LM Studio 本地模型
 class LMStudioProvider implements AIProvider {
-  async chat(messages: ChatMessage[], config: ModelConfig): Promise<string> {
+  async chat(messages: ChatMessage[], config: ModelConfig, tools?: Tool[]): Promise<{ content: string; toolCalls?: ToolCall[] }> {
     const endpoint = getEndpoint(config) || 'http://localhost:1234/v1'
     const url = `${endpoint}/chat/completions`
 
-    const response = await axios.post(url, {
+    const requestBody: any = {
       model: getModelName(config) || 'llama-3.3-Instruct-Merged',
-      messages: messages.filter(m => m.role !== 'system'),
+      messages: messages,
       temperature: 0.7
-    }, {
+    }
+
+    if (tools && tools.length > 0) {
+      requestBody.tools = tools
+    }
+
+    const response = await axios.post(url, requestBody, {
       headers: {
         'Content-Type': 'application/json'
       }
     })
 
-    return response.data.choices[0]?.message?.content || ''
+    const message = response.data.choices[0]?.message
+    return {
+      content: message?.content || '',
+      toolCalls: message?.tool_calls
+    }
   }
 }
 
@@ -322,6 +425,7 @@ class LMStudioProvider implements AIProvider {
 class AIService {
   private providers: Map<string, AIProvider> = new Map()
   private configStore: ModelConfigStore;
+  private toolExecutor: ToolExecutor | null = null;
 
   constructor() {
     this.providers.set('qwen', new QwenProvider())
@@ -336,6 +440,11 @@ class AIService {
 
     // 初始化时加载配置
     this.configStore = loadFromStorage();
+  }
+
+  // 设置工具执行器
+  setToolExecutor(executor: ToolExecutor): void {
+    this.toolExecutor = executor
   }
 
   // 获取所有模型配置
@@ -408,7 +517,14 @@ class AIService {
     this.updateModel(id, { apiKey });
   }
 
+  // 简单的聊天方法 (不带工具)
   async chat(messages: ChatMessage[], config: ModelConfig): Promise<string> {
+    const result = await this.chatWithTools(messages, config)
+    return result.content
+  }
+
+  // 带工具调用的聊天方法
+  async chatWithTools(messages: ChatMessage[], config: ModelConfig, tools?: Tool[]): Promise<{ content: string; toolCalls?: ToolCall[] }> {
     const provider = this.providers.get(config.provider)
     if (!provider) {
       throw new Error(`Unknown provider: ${config.provider}`)
@@ -421,14 +537,74 @@ class AIService {
     }
 
     try {
-      return await provider.chat(messages, config)
+      return await provider.chat(messages, config, tools)
     } catch (error) {
       const axiosError = error as AxiosError
       console.error(`[AI] ${config.provider} error:`, axiosError.message)
-      console.error('[AI] Response status:', axiosError.response.status)
+      if (axiosError.response) {
+        console.error('[AI] Response status:', axiosError.response.status)
         console.error('[AI] Response data:', axiosError.response.data)
-        throw new Error(`AI 调用失败: ${axiosError.message}`)
+      }
+      throw new Error(`AI 调用失败: ${axiosError.message}`)
     }
+  }
+
+  // 工具调用循环 - 核心方法
+  async chatWithToolLoop(
+    messages: ChatMessage[],
+    config: ModelConfig,
+    tools: Tool[],
+    maxIterations: number = 10
+  ): Promise<string> {
+    let currentMessages = [...messages]
+    let iterations = 0
+
+    while (iterations < maxIterations) {
+      iterations++
+
+      // 调用 AI
+      const response = await this.chatWithTools(currentMessages, config, tools)
+
+      // 添加助手回复到消息历史
+      const assistantMessage: ChatMessage = {
+        role: 'assistant',
+        content: response.content,
+        tool_calls: response.toolCalls
+      }
+      currentMessages = [...currentMessages, assistantMessage]
+
+      // 如果没有工具调用，直接返回内容
+      if (!response.toolCalls || response.toolCalls.length === 0) {
+        return response.content
+      }
+
+      // 执行工具调用
+      for (const toolCall of response.toolCalls) {
+        console.log(`[Tool] Executing: ${toolCall.function.name}`)
+
+        let toolResult: string
+        try {
+          if (this.toolExecutor) {
+            toolResult = await this.toolExecutor(toolCall.function.name, toolCall.function.arguments)
+          } else {
+            toolResult = JSON.stringify({ error: 'No tool executor configured' })
+          }
+        } catch (error) {
+          toolResult = JSON.stringify({ error: (error as Error).message })
+        }
+
+        // 添加工具结果到消息历史
+        const toolMessage: ChatMessage = {
+          role: 'tool',
+          content: toolResult,
+          tool_call_id: toolCall.id
+        }
+        currentMessages = [...currentMessages, toolMessage]
+      }
+    }
+
+    console.warn(`[Tool] Max iterations (${maxIterations}) reached`)
+    return currentMessages.find(m => m.role === 'assistant')?.content || '工具调用达到最大次数'
   }
 
   // 测试模型连接

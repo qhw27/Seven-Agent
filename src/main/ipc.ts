@@ -1,11 +1,11 @@
-import { app, ipcMain } from 'electron'
+﻿import { ipcMain } from 'electron'
 import { initDatabase, query, run, get, all, saveDatabase } from './database'
 import { startServer } from './server'
-import { aiService, DEFAULT_MODEL, type ChatMessage } from './ai-service'
-import { ModelConfig, PRESET_MODELS,  } from '../shared/model-config';
-import { DatabaseConnection } from './database/connection'
-import { DatabaseMigrations } from './database/migrations'
-import { SessionAPI } from './services/session.api'
+import { aiService, DEFAULT_MODEL, type ChatMessage, type Tool } from './ai-service'
+import { ModelConfig, PRESET_MODELS } from '../shared/model-config'
+import { SkillManager } from './SkillManager'
+import { builtInToolRegistry } from './BuiltInToolRegistry'
+import type { Skill } from './SkillHelpers'
 
 // 打印环境变量（调试用）
 console.log('[Env] ===== Seven App Start =====')
@@ -34,6 +34,36 @@ const MODEL_ID_MAP: Record<string, string> = {
   'deepseek': 'deepseek-chat',
 }
 
+// SkillManager 单例
+let skillManagerInstance: SkillManager | null = null
+
+function getSkillManager(): SkillManager {
+  if (!skillManagerInstance) {
+    skillManagerInstance = new SkillManager()
+  }
+  return skillManagerInstance
+}
+
+// 辅助函数：获取所有技能（本地 + 云端）
+async function getAllSkills(): Promise<Skill[]> {
+  const skillManager = getSkillManager()
+  const [localSkills, hubSkills] = await Promise.all([
+    skillManager.getLocalSkills(),
+    skillManager.getSkillHubSkills(50)
+  ])
+
+  // 合并去重
+  const skillMap = new Map<string, Skill>()
+  for (const skill of localSkills) {
+    skillMap.set(skill.id, skill)
+  }
+  for (const skill of hubSkills) {
+    if (!skillMap.has(skill.id)) {
+      skillMap.set(skill.id, skill)
+    }
+  }
+  return Array.from(skillMap.values())
+}
 
 // IPC 处理器
 function setupIpcHandlers(): void {
@@ -152,7 +182,8 @@ function setupIpcHandlers(): void {
   ipcMain.handle('db-update-session-title', async (_event, sessionId: string, newTitle: string) => {
     try {
       const now = new Date().toISOString()
-      run('UPDATE sessions SET title = ?, last_modified = ? WHERE id = ?', [newTitle.trim(), now, sessionId])
+      const titleValue = typeof newTitle === 'string' ? newTitle : (newTitle || '')
+      run('UPDATE sessions SET title = ?, last_modified = ? WHERE id = ?', [titleValue.trim(), now, sessionId])
       saveDatabase()
       const session = get<any>('SELECT * FROM sessions WHERE id = ?', [sessionId])
       return {
@@ -268,7 +299,16 @@ function setupIpcHandlers(): void {
   })
 
   // AI 对话 - 使用预设模型配置
-  ipcMain.handle('ai:chat', async (_event, messages: ChatMessage[], options?: { model?: string }) => {
+  ipcMain.handle('ai:chat', async (_event, messages: ChatMessage[], options?: { model?: string; useTools?: boolean }) => {
+    // 添加系统提示词
+    const systemPrompt = `你叫 Seven，是一个智能 AI 助手。你可以帮助用户完成各种任务，包括回答问题、编写代码、搜索信息等。请用友好的方式回答用户的问题。`
+
+    // 在消息最前面添加 system message
+    const messagesWithSystem: ChatMessage[] = [
+      { role: 'system', content: systemPrompt },
+      ...messages
+    ]
+
     // 处理模型 ID 映射
     let modelId = options?.model || DEFAULT_MODEL.id
 
@@ -278,15 +318,12 @@ function setupIpcHandlers(): void {
     }
 
     console.log('[AI] Chat with model:', modelId)
-    console.log('[AI] Available preset models:', PRESET_MODELS.map(m => m.id))
 
     // 先尝试从预设模型获取配置
     let modelConfig = aiService.getModelById(modelId)
-    console.log('[AI] Found preset model:', modelConfig ? modelConfig.id : 'not found')
 
     // 如果没找到预设模型，从数据库查找用户自定义模型
     if (!modelConfig) {
-      console.log('[AI] Searching in database for:', modelId)
       const dbModel = get<{
         id: string
         name: string
@@ -308,14 +345,13 @@ function setupIpcHandlers(): void {
           input: ['text'],
           cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
           contextWindow: 32000,
-          maxTokens: 4096
+          maxTokens: 4096,
+          api: 'openai'
         }
-        console.log('[AI] Found in database:', dbModel.id)
       }
     }
 
     // 如果还没有，尝试按 provider 查找
-    // 修复：使用预设模型的 provider 来查找，而不是 modelId
     if (!modelConfig?.apiKey) {
       const providerToSearch = modelConfig?.provider || modelId
       const dbModelByProvider = get<{
@@ -339,23 +375,13 @@ function setupIpcHandlers(): void {
           input: ['text'],
           cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
           contextWindow: 32000,
-          maxTokens: 4096
+          maxTokens: 4096,
+          api: 'openai'
         }
       }
     }
 
-    // 如果找到了配置，打印配置信息
-    if (modelConfig) {
-      console.log('[AI] Using config:', {
-        id: modelConfig.id,
-        provider: modelConfig.provider,
-        hasApiKey: !!modelConfig.apiKey,
-        baseURL: modelConfig.baseURL,
-        model: modelConfig.model
-      })
-    }
-
-    // 简化版：只用环境变量覆盖 API Key
+    // 环境变量覆盖 API Key
     let envApiKey: string | undefined
     const providerType = modelConfig?.provider || modelId
     if (providerType === 'anthropic') {
@@ -372,8 +398,7 @@ function setupIpcHandlers(): void {
       envApiKey = process.env.KIMI_API_KEY
     }
 
-    if (envApiKey) {
-      console.log('[AI] Using env API Key for:', providerType)
+    if (envApiKey && modelConfig) {
       modelConfig = { ...modelConfig, apiKey: envApiKey }
     }
 
@@ -384,7 +409,32 @@ function setupIpcHandlers(): void {
     }
 
     try {
-      const response = await aiService.chat(messages, modelConfig)
+      // 获取工具列表
+      const tools: Tool[] = []
+
+      // 1. 添加内置工具
+      if (options?.useTools) {
+        const builtInTools = builtInToolRegistry.getToolDefinitions()
+        tools.push(...builtInTools)
+
+        // 2. 添加 SkillHub 技能作为工具
+        try {
+          const { ipcRenderer } = require('electron')
+          const fetchedTools: Tool[] = await ipcRenderer.invoke('skill:getTools')
+          tools.push(...fetchedTools)
+        } catch (e) {
+          console.error('[AI] Get tools error:', e)
+        }
+      }
+
+      // 使用工具调用循环（如果有工具）或普通聊天
+      let response: string
+      if (tools.length > 0) {
+        response = await aiService.chatWithToolLoop(messagesWithSystem, modelConfig, tools)
+      } else {
+        response = await aiService.chat(messagesWithSystem, modelConfig)
+      }
+
       return { content: response }
     } catch (error) {
       console.error('[AI] Error:', error)
@@ -473,7 +523,6 @@ function setupIpcHandlers(): void {
     modelName?: string
   }) => {
     const { id, apiKey, name, provider, endpoint, modelName } = config
-    console.log('[AI] Saving model config:', { id, apiKey: apiKey ? '***' : 'empty' })
 
     // 映射简称到完整 ID
     let finalId = id
@@ -505,14 +554,11 @@ function setupIpcHandlers(): void {
 
   // 删除模型
   ipcMain.handle('ai:deleteModel', async (_event, modelId: string) => {
-    console.log('[AI] Delete request for modelId:', modelId)
-
     const existing = get<{ id: number }>('SELECT id FROM models WHERE id = ?', [modelId])
 
     if (existing) {
       run('DELETE FROM models WHERE id = ?', [modelId])
       saveDatabase()
-      console.log('[AI] Model deleted successfully')
       return { success: true, message: '模型已删除' }
     } else {
       return { success: false, message: '模型不存在' }
@@ -541,9 +587,15 @@ function setupIpcHandlers(): void {
           id: modelId,
           name: dbModel.name,
           provider: dbModel.provider as ModelConfig['provider'],
-          baseURL: dbModel.endpoint,
+          baseURL: dbModel.endpoint || '',
           model: dbModel.modelName || dbModel.name,
-          apiKey: apiKey || dbModel.api_key
+          apiKey: apiKey || dbModel.api_key || '',
+          reasoning: false,
+          input: ['text'],
+          cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
+          contextWindow: 32000,
+          maxTokens: 4096,
+          api: 'openai'
         }
       }
     }
@@ -556,27 +608,40 @@ function setupIpcHandlers(): void {
         provider: (provider || 'custom') as ModelConfig['provider'],
         baseURL: endpoint || '',
         model: modelName || id || 'test',
-        apiKey: apiKey || ''
+        apiKey: apiKey || '',
+        reasoning: false,
+        input: ['text'],
+        cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
+        contextWindow: 32000,
+        maxTokens: 4096,
+        api: 'openai'
       }
     }
 
-    const modelEndpoint = model.baseURL || model.endpoint || ''
+    const modelEndpoint = model.baseURL || ''
     if (!modelEndpoint && !model.apiKey) {
       return { success: false, message: '缺少 API 地址或 API Key' }
     }
 
-    const testConfig = {
-      ...model,
+    const testConfig: ModelConfig = {
+      id: model.id,
+      name: model.name,
+      provider: model.provider,
+      model: model.model,
       baseURL: modelEndpoint,
-      apiKey: apiKey || model.apiKey
+      apiKey: apiKey || model.apiKey || '',
+      reasoning: model.reasoning,
+      input: model.input,
+      cost: model.cost,
+      contextWindow: model.contextWindow,
+      maxTokens: model.maxTokens,
+      api: model.api
     }
-    console.log('[Test] Testing connection with:', { id: testConfig.id, provider: testConfig.provider, endpoint: testConfig.baseURL })
 
     try {
-      const success = await aiService.testConnection(testConfig)
-      return { success, message: success ? '连接成功' : '连接失败' }
+      const result = await aiService.testConnection(testConfig)
+      return { success: result.success, message: result.message }
     } catch (error) {
-      console.error('[Test] Error:', error)
       return { success: false, message: error instanceof Error ? error.message : '连接失败' }
     }
   })
@@ -592,9 +657,6 @@ function setupIpcHandlers(): void {
       return []
     }
   })
-
-  // 外部链接 - 使用 index.ts 中已有的处理器
-  // system:getPath 和 system:openExternal 已在 index.ts 中注册
 
   // 窗口操作
   ipcMain.handle('window:minimize', async (event) => {
@@ -615,6 +677,140 @@ function setupIpcHandlers(): void {
     const win = (event as any).sender.getOwnerBrowserWindow()
     win.close()
   })
+
+  // 获取本地技能列表
+  ipcMain.handle('skill:getLocalSkills', async () => {
+    try {
+      const skillManager = getSkillManager()
+      return await skillManager.getLocalSkills()
+    } catch (error) {
+      console.error('[IPC] skill:getLocalSkills error:', error)
+      return []
+    }
+  })
+
+  // 获取 SkillHub 技能列表
+  ipcMain.handle('skill:getSkillHubSkills', async (_event, limit: number = 50) => {
+    try {
+      const skillManager = getSkillManager()
+      return await skillManager.getSkillHubSkills(limit)
+    } catch (error) {
+      console.error('[IPC] skill:getSkillHubSkills error:', error)
+      return []
+    }
+  })
+
+  // 搜索 SkillHub 技能
+  ipcMain.handle('skill:searchSkills', async (_event, query: string) => {
+    try {
+      const skillManager = getSkillManager()
+      return await skillManager.searchSkillHubSkills(query)
+    } catch (error) {
+      console.error('[IPC] skill:searchSkills error:', error)
+      return []
+    }
+  })
+
+  // 下载技能
+  ipcMain.handle('skill:downloadSkill', async (_event, skillId: string) => {
+    try {
+      const skillManager = getSkillManager()
+      return await skillManager.downloadSkill(skillId)
+    } catch (error) {
+      console.error('[IPC] skill:downloadSkill error:', error)
+      return false
+    }
+  })
+
+  // 删除技能
+  ipcMain.handle('skill:deleteSkill', async (_event, skillId: string) => {
+    try {
+      const skillManager = getSkillManager()
+      return await skillManager.deleteSkill(skillId)
+    } catch (error) {
+      console.error('[IPC] skill:deleteSkill error:', error)
+      return false
+    }
+  })
+
+  // 执行技能
+  ipcMain.handle('skill:executeSkill', async (_event, skillId: string, query: string) => {
+    try {
+      const skillManager = getSkillManager()
+      return await skillManager.executeSkill(skillId, query)
+    } catch (error) {
+      console.error('[IPC] skill:executeSkill error:', error)
+      return { success: false, output: '', error: (error as Error).message }
+    }
+  })
+
+  // 技能操作
+  ipcMain.handle('skill:list', async () => {
+    try {
+      const skills = await getAllSkills()
+      return skills
+    } catch (error) {
+      console.error('[IPC] skill:list error:', error)
+      return []
+    }
+  })
+
+  ipcMain.handle('skill:execute', async (_event, skillId: string, queryStr: string) => {
+    try {
+      const skillManager = getSkillManager()
+      const result = await skillManager.executeSkill(skillId, queryStr)
+      return result
+    } catch (error) {
+      console.error('[IPC] skill:execute error:', error)
+      return { success: false, output: '', error: (error as Error).message }
+    }
+  })
+
+  // 技能工具调用 - 支持 AI 工具循环
+  ipcMain.handle('skill:getTools', async () => {
+    try {
+      const skills = await getAllSkills()
+
+      // 将技能转换为工具格式
+      const tools: Tool[] = skills.map((skill: Skill) => ({
+        type: 'function',
+        function: {
+          name: `skill_${skill.id}`,
+          description: skill.description || `执行技能: ${skill.name}`,
+          parameters: {
+            type: 'object',
+            properties: {
+              query: { type: 'string', description: '要执行的查询或指令' }
+            },
+            required: ['query']
+          }
+        }
+      }))
+
+      return tools
+    } catch (error) {
+      console.error('[IPC] skill:getTools error:', error)
+      return []
+    }
+  })
+
+  // 工具执行
+  ipcMain.handle('tool:execute', async (_event, toolName: string, args: string) => {
+    try {
+      const skillManager = getSkillManager()
+
+      // 解析工具名称 (skill_xxx -> xxx)
+      const skillId = toolName.startsWith('skill_') ? toolName.substring(6) : toolName
+      const parsedArgs = JSON.parse(args)
+      const queryStr = parsedArgs.query || args
+
+      const result = await skillManager.executeSkill(skillId, queryStr)
+      return result.success ? result.output : JSON.stringify({ error: result.error })
+    } catch (error) {
+      console.error('[IPC] tool:execute error:', error)
+      return JSON.stringify({ error: (error as Error).message })
+    }
+  })
 }
 
 
@@ -628,6 +824,30 @@ async function startApp(): Promise<void> {
 
   // 设置 IPC 处理器
   setupIpcHandlers()
+
+  // 设置工具执行器（用于AI工具调用循环）
+  // 优先使用内置工具，其次使用 SkillHub 技能
+  aiService.setToolExecutor(async (toolName: string, args: string): Promise<string> => {
+    try {
+      // 1. 尝试内置工具
+      const builtInTool = builtInToolRegistry.getToolByName(toolName)
+      if (builtInTool) {
+        return await builtInToolRegistry.executeTool(toolName, args)
+      }
+
+      // 2. 尝试 SkillHub 技能
+      const skillManager = getSkillManager()
+      const skillId = toolName.startsWith('skill_') ? toolName.substring(6) : toolName
+      const parsedArgs = JSON.parse(args)
+      const queryStr = parsedArgs.query || args
+
+      const result = await skillManager.executeSkill(skillId, queryStr)
+      return result.success ? result.output : JSON.stringify({ error: result.error })
+    } catch (error) {
+      console.error('[Tool] Execute error:', error)
+      return JSON.stringify({ error: (error as Error).message })
+    }
+  })
 
   console.log('[App] Seven started, server port:', serverPort)
 }

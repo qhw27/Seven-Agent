@@ -32,26 +32,28 @@ async function initDatabase(): Promise<Database> {
     console.log('[Database] Created new database (fallback)')
   }
 
-  // 创建表
+  // 创建表 - 使用 sessions 作为表名
   db.run(`
-    CREATE TABLE IF NOT EXISTS conversations (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
+    CREATE TABLE IF NOT EXISTS sessions (
+      id TEXT PRIMARY KEY,
       title TEXT NOT NULL,
       model TEXT DEFAULT 'qwen',
+      thinking_level TEXT DEFAULT 'medium',
       created_at TEXT DEFAULT (datetime('now')),
-      updated_at TEXT DEFAULT (datetime('now'))
+      last_modified TEXT DEFAULT (datetime('now')),
+      message_count INTEGER DEFAULT 0
     )
   `)
 
   db.run(`
     CREATE TABLE IF NOT EXISTS messages (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      conversation_id INTEGER NOT NULL,
+      id TEXT PRIMARY KEY,
+      session_id TEXT NOT NULL,
       role TEXT NOT NULL,
-      content TEXT NOT NULL,
-      model TEXT,
+      content TEXT,
       created_at TEXT DEFAULT (datetime('now')),
-      FOREIGN KEY (conversation_id) REFERENCES conversations(id) ON DELETE CASCADE
+      metadata TEXT,
+      FOREIGN KEY (session_id) REFERENCES sessions(id) ON DELETE CASCADE
     )
   `)
 

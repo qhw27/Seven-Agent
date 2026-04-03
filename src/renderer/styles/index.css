@@ -1,3 +1,162 @@
+/* ========================================
+   Seven - Theme System
+   支持深色/浅色主题切换
+   ======================================== */
+
+/* 深色主题 (默认) */
+[data-theme="dark"] {
+  /* 主色调 - 渐变紫蓝 */
+  --primary: #6366f1;
+  --primary-hover: #4f46e5;
+  --primary-light: #818cf8;
+  --accent: #8b5cf6;
+  --accent-hover: #7c3aed;
+  
+  /* 渐变背景 */
+  --gradient-primary: linear-gradient(135deg, #6366f1 0%, #8b5cf6 50%, #a855f7 100%);
+  --gradient-glow: linear-gradient(135deg, rgba(99, 102, 241, 0.3) 0%, rgba(139, 92, 246, 0.3) 100%);
+  
+  /* 背景色 - 深色模式 */
+  --bg-primary: #0a0a0f;
+  --bg-secondary: #12121a;
+  --bg-tertiary: #1a1a24;
+  --bg-elevated: #22222e;
+  --bg-glass: rgba(18, 18, 26, 0.85);
+  
+  /* 文字颜色 */
+  --text-primary: #f4f4f5;
+  --text-secondary: #a1a1aa;
+  --text-muted: #71717a;
+  --text-inverse: #0a0a0f;
+  
+  /* 边框与分割线 */
+  --border-subtle: rgba(255, 255, 255, 0.06);
+  --border-default: rgba(255, 255, 255, 0.1);
+  --border-strong: rgba(255, 255, 255, 0.15);
+  
+  /* 功能色 */
+  --success: #10b981;
+  --warning: #f59e0b;
+  --error: #ef4444;
+  --info: #3b82f6;
+  
+  /* 阴影 */
+  --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.3);
+  --shadow-md: 0 4px 16px rgba(0, 0, 0, 0.4);
+  --shadow-lg: 0 8px 32px rgba(0, 0, 0, 0.5);
+  --shadow-glow: 0 0 30px rgba(99, 102, 241, 0.3);
+}
+
+/* 浅色主题 */
+[data-theme="light"] {
+  /* 主色调 - 渐变紫蓝 */
+  --primary: #6366f1;
+  --primary-hover: #4f46e5;
+  --primary-light: #818cf8;
+  --accent: #8b5cf6;
+  --accent-hover: #7c3aed;
+  
+  /* 渐变背景 */
+  --gradient-primary: linear-gradient(135deg, #6366f1 0%, #8b5cf6 50%, #a855f7 100%);
+  --gradient-glow: linear-gradient(135deg, rgba(99, 102, 241, 0.2) 0%, rgba(139, 92, 246, 0.2) 100%);
+  
+  /* 背景色 - 浅色模式 */
+  --bg-primary: #ffffff;
+  --bg-secondary: #f8f9fa;
+  --bg-tertiary: #f1f3f5;
+  --bg-elevated: #ffffff;
+  --bg-glass: rgba(255, 255, 255, 0.9);
+  
+  /* 文字颜色 */
+  --text-primary: #1a1a2e;
+  --text-secondary: #4a4a5a;
+  --text-muted: #9ca3af;
+  --text-inverse: #ffffff;
+  
+  /* 边框与分割线 */
+  --border-subtle: rgba(0, 0, 0, 0.04);
+  --border-default: rgba(0, 0, 0, 0.08);
+  --border-strong: rgba(0, 0, 0, 0.12);
+  
+  /* 功能色 */
+  --success: #10b981;
+  --warning: #f59e0b;
+  --error: #ef4444;
+  --info: #3b82f6;
+  
+  /* 阴影 */
+  --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.08);
+  --shadow-md: 0 4px 16px rgba(0, 0, 0, 0.1);
+  --shadow-lg: 0 8px 32px rgba(0, 0, 0, 0.15);
+  --shadow-glow: 0 0 30px rgba(99, 102, 241, 0.15);
+}
+
+/* 默认使用深色主题 */
+:root {
+  --primary: #6366f1;
+  --primary-hover: #4f46e5;
+  --primary-light: #818cf8;
+  --accent: #8b5cf6;
+  --accent-hover: #7c3aed;
+  
+  /* 渐变背景 */
+  --gradient-primary: linear-gradient(135deg, #6366f1 0%, #8b5cf6 50%, #a855f7 100%);
+  --gradient-glow: linear-gradient(135deg, rgba(99, 102, 241, 0.3) 0%, rgba(139, 92, 246, 0.3) 100%);
+  
+  /* 背景色 - 深色模式 */
+  --bg-primary: #0a0a0f;
+  --bg-secondary: #12121a;
+  --bg-tertiary: #1a1a24;
+  --bg-elevated: #22222e;
+  --bg-glass: rgba(18, 18, 26, 0.85);
+  
+  /* 文字颜色 */
+  --text-primary: #f4f4f5;
+  --text-secondary: #a1a1aa;
+  --text-muted: #71717a;
+  --text-inverse: #0a0a0f;
+  
+  /* 边框与分割线 */
+  --border-subtle: rgba(255, 255, 255, 0.06);
+  --border-default: rgba(255, 255, 255, 0.1);
+  --border-strong: rgba(255, 255, 255, 0.15);
+  
+  /* 功能色 */
+  --success: #10b981;
+  --warning: #f59e0b;
+  --error: #ef4444;
+  --info: #3b82f6;
+  
+  /* 阴影 */
+  --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.3);
+  --shadow-md: 0 4px 16px rgba(0, 0, 0, 0.4);
+  --shadow-lg: 0 8px 32px rgba(0, 0, 0, 0.5);
+  --shadow-glow: 0 0 30px rgba(99, 102, 241, 0.3);
+  
+  /* 间距 */
+  --spacing-xs: 4px;
+  --spacing-sm: 8px;
+  --spacing-md: 16px;
+  --spacing-lg: 24px;
+  --spacing-xl: 32px;
+  
+  /* 圆角 */
+  --radius-sm: 6px;
+  --radius-md: 12px;
+  --radius-lg: 16px;
+  --radius-xl: 24px;
+  --radius-full: 9999px;
+  
+  /* 过渡 */
+  --transition-fast: 0.15s ease;
+  --transition-normal: 0.25s ease;
+  --transition-smooth: 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* ========================================
+   Base Reset & Typography
+   ======================================== */
+
 * {
   margin: 0;
   padding: 0;
@@ -11,29 +170,534 @@ html, body, #root {
 }
 
 body {
-  font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'SF Pro Text', 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-  background: #f2f2f7;
-  color: #000;
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  line-height: 1.5;
 }
 
-/* iOS 风格滚动条 */
+/* ========================================
+   Scrollbar Styling
+   ======================================== */
+
 ::-webkit-scrollbar {
-  width: 0;
-  height: 0;
+  width: 6px;
+  height: 6px;
 }
 
-/* iOS 按钮点击效果 */
-* {
-  -webkit-tap-highlight-color: transparent;
+::-webkit-scrollbar-track {
+  background: transparent;
 }
 
-/* 安全区域 */
-.safe-area-bottom {
-  padding-bottom: env(safe-area-inset-bottom);
+::-webkit-scrollbar-thumb {
+  background: var(--border-default);
+  border-radius: var(--radius-full);
 }
 
-.safe-area-top {
-  padding-top: env(safe-area-inset-top);
+::-webkit-scrollbar-thumb:hover {
+  background: var(--border-strong);
+}
+
+/* ========================================
+   Animation Keyframes
+   ======================================== */
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes slideUp {
+  from { 
+    opacity: 0; 
+    transform: translateY(20px); 
+  }
+  to { 
+    opacity: 1; 
+    transform: translateY(0); 
+  }
+}
+
+@keyframes slideInLeft {
+  from { 
+    opacity: 0; 
+    transform: translateX(-20px); 
+  }
+  to { 
+    opacity: 1; 
+    transform: translateX(0); 
+  }
+}
+
+@keyframes pulse {
+  0%, 100% { 
+    opacity: 1; 
+  }
+  50% { 
+    opacity: 0.6; 
+  }
+}
+
+@keyframes breathe {
+  0%, 100% { 
+    box-shadow: 0 0 0 0 rgba(99, 102, 241, 0.4);
+  }
+  50% { 
+    box-shadow: 0 0 0 8px rgba(99, 102, 241, 0);
+  }
+}
+
+@keyframes shimmer {
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
+}
+
+@keyframes spin {
+  from { 
+    transform: rotate(0deg); 
+  }
+  to { 
+    transform: rotate(360deg); 
+  }
+}
+
+/* ========================================
+   Utility Classes
+   ======================================== */
+
+.glass {
+  background: var(--bg-glass);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+}
+
+.gradient-text {
+  background: var(--gradient-primary);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.gradient-border {
+  position: relative;
+}
+
+.gradient-border::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  padding: 1px;
+  border-radius: inherit;
+  background: var(--gradient-primary);
+  -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  pointer-events: none;
+}
+
+.glow-hover {
+  transition: var(--transition-smooth);
+}
+
+.glow-hover:hover {
+  box-shadow: var(--shadow-glow);
+}
+
+/* ========================================
+   Ant Design Overrides - 深色主题
+   ======================================== */
+
+[data-theme="dark"] {
+  /* Input */
+  .ant-input, .ant-input-affix-wrapper {
+    background: var(--bg-tertiary) !important;
+    border-color: var(--border-default) !important;
+    color: var(--text-primary) !important;
+  }
+
+  .ant-input::placeholder {
+    color: var(--text-muted) !important;
+  }
+
+  .ant-input:focus, .ant-input-affix-wrapper:focus,
+  .ant-input:hover, .ant-input-affix-wrapper:hover {
+    border-color: var(--primary) !important;
+    box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.2) !important;
+  }
+
+  /* Select */
+  .ant-select-selector {
+    background: var(--bg-tertiary) !important;
+    border-color: var(--border-default) !important;
+    color: var(--text-primary) !important;
+  }
+
+  .ant-select-dropdown {
+    background: var(--bg-elevated) !important;
+    border: 1px solid var(--border-default) !important;
+  }
+
+  .ant-select-item {
+    color: var(--text-secondary) !important;
+  }
+
+  .ant-select-item-option-selected {
+    background: var(--bg-tertiary) !important;
+    color: var(--text-primary) !important;
+  }
+
+  .ant-select-item-option-active {
+    background: var(--bg-tertiary) !important;
+  }
+
+  /* Button */
+  .ant-btn-primary {
+    background: var(--gradient-primary) !important;
+    border: none !important;
+    box-shadow: 0 2px 8px rgba(99, 102, 241, 0.3) !important;
+  }
+
+  .ant-btn-primary:hover {
+    background: var(--gradient-primary) !important;
+    box-shadow: 0 4px 16px rgba(99, 102, 241, 0.4) !important;
+    transform: translateY(-1px);
+  }
+
+  .ant-btn-primary:active {
+    transform: translateY(0);
+  }
+
+  /* Modal */
+  .ant-modal-content {
+    background: var(--bg-secondary) !important;
+    border: 1px solid var(--border-default) !important;
+  }
+
+  .ant-modal-header {
+    background: transparent !important;
+    border-bottom: 1px solid var(--border-default) !important;
+  }
+
+  .ant-modal-title {
+    color: var(--text-primary) !important;
+  }
+
+  .ant-modal-close {
+    color: var(--text-muted) !important;
+  }
+
+  /* Message */
+  .ant-message-notice-content {
+    background: var(--bg-elevated) !important;
+    border: 1px solid var(--border-default) !important;
+    color: var(--text-primary) !important;
+  }
+
+  /* Spin */
+  .ant-spin-dot-item {
+    background: var(--primary) !important;
+  }
+
+  /* Empty */
+  .ant-empty-description {
+    color: var(--text-muted) !important;
+  }
+
+  /* Tooltip */
+  .ant-tooltip-inner {
+    background: var(--bg-elevated) !important;
+    color: var(--text-primary) !important;
+  }
+
+  .ant-tooltip-arrow::before {
+    background: var(--bg-elevated) !important;
+  }
+
+  /* Tabs */
+  .ant-tabs-tab {
+    color: var(--text-secondary) !important;
+  }
+
+  .ant-tabs-tab:hover {
+    color: var(--text-primary) !important;
+  }
+
+  .ant-tabs-tab-active .ant-tabs-tab-btn {
+    color: var(--primary) !important;
+  }
+
+  .ant-tabs-ink-bar {
+    background: var(--gradient-primary) !important;
+  }
+
+  /* List */
+  .ant-list-item {
+    border-bottom-color: var(--border-subtle) !important;
+  }
+
+  /* Tag */
+  .ant-tag {
+    background: var(--bg-tertiary) !important;
+    border-color: var(--border-default) !important;
+    color: var(--text-secondary) !important;
+  }
+
+  /* Card */
+  .ant-card {
+    background: var(--bg-tertiary) !important;
+    border-color: var(--border-subtle) !important;
+  }
+
+  /* Form */
+  .ant-form-item-label > label {
+    color: var(--text-secondary) !important;
+  }
+
+  /* Checkbox */
+  .ant-checkbox-inner {
+    background: var(--bg-tertiary) !important;
+    border-color: var(--border-default) !important;
+  }
+
+  /* Switch */
+  .ant-switch {
+    background: var(--bg-tertiary) !important;
+  }
+}
+
+/* ========================================
+   Ant Design Overrides - 浅色主题
+   ======================================== */
+
+[data-theme="light"] {
+  /* Input */
+  .ant-input, .ant-input-affix-wrapper {
+    background: var(--bg-primary) !important;
+    border-color: var(--border-default) !important;
+    color: var(--text-primary) !important;
+  }
+
+  .ant-input::placeholder {
+    color: var(--text-muted) !important;
+  }
+
+  .ant-input:focus, .ant-input-affix-wrapper:focus,
+  .ant-input:hover, .ant-input-affix-wrapper:hover {
+    border-color: var(--primary) !important;
+    box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.15) !important;
+  }
+
+  /* Select */
+  .ant-select-selector {
+    background: var(--bg-primary) !important;
+    border-color: var(--border-default) !important;
+    color: var(--text-primary) !important;
+  }
+
+  .ant-select-dropdown {
+    background: var(--bg-elevated) !important;
+    border: 1px solid var(--border-default) !important;
+    box-shadow: var(--shadow-md) !important;
+  }
+
+  .ant-select-item {
+    color: var(--text-secondary) !important;
+  }
+
+  .ant-select-item-option-selected {
+    background: var(--bg-tertiary) !important;
+    color: var(--text-primary) !important;
+  }
+
+  .ant-select-item-option-active {
+    background: var(--bg-tertiary) !important;
+  }
+
+  /* Button */
+  .ant-btn-primary {
+    background: var(--gradient-primary) !important;
+    border: none !important;
+    box-shadow: 0 2px 8px rgba(99, 102, 241, 0.25) !important;
+  }
+
+  .ant-btn-primary:hover {
+    background: var(--gradient-primary) !important;
+    box-shadow: 0 4px 16px rgba(99, 102, 241, 0.35) !important;
+    transform: translateY(-1px);
+  }
+
+  .ant-btn-primary:active {
+    transform: translateY(0);
+  }
+
+  .ant-btn-default {
+    background: var(--bg-primary) !important;
+    border-color: var(--border-default) !important;
+    color: var(--text-primary) !important;
+  }
+
+  .ant-btn-default:hover {
+    border-color: var(--primary) !important;
+    color: var(--primary) !important;
+  }
+
+  /* Modal */
+  .ant-modal-content {
+    background: var(--bg-primary) !important;
+    border: 1px solid var(--border-default) !important;
+    box-shadow: var(--shadow-lg) !important;
+  }
+
+  .ant-modal-header {
+    background: transparent !important;
+    border-bottom: 1px solid var(--border-subtle) !important;
+  }
+
+  .ant-modal-title {
+    color: var(--text-primary) !important;
+  }
+
+  .ant-modal-close {
+    color: var(--text-muted) !important;
+  }
+
+  .ant-modal-close:hover {
+    color: var(--text-primary) !important;
+  }
+
+  /* Message */
+  .ant-message-notice-content {
+    background: var(--bg-elevated) !important;
+    border: 1px solid var(--border-default) !important;
+    color: var(--text-primary) !important;
+    box-shadow: var(--shadow-md) !important;
+  }
+
+  /* Spin */
+  .ant-spin-dot-item {
+    background: var(--primary) !important;
+  }
+
+  /* Empty */
+  .ant-empty-description {
+    color: var(--text-muted) !important;
+  }
+
+  /* Tooltip */
+  .ant-tooltip-inner {
+    background: var(--bg-elevated) !important;
+    color: var(--text-primary) !important;
+    box-shadow: var(--shadow-md) !important;
+  }
+
+  .ant-tooltip-arrow::before {
+    background: var(--bg-elevated) !important;
+  }
+
+  /* Tabs */
+  .ant-tabs-tab {
+    color: var(--text-secondary) !important;
+  }
+
+  .ant-tabs-tab:hover {
+    color: var(--text-primary) !important;
+  }
+
+  .ant-tabs-tab-active .ant-tabs-tab-btn {
+    color: var(--primary) !important;
+  }
+
+  .ant-tabs-ink-bar {
+    background: var(--gradient-primary) !important;
+  }
+
+  /* List */
+  .ant-list-item {
+    border-bottom-color: var(--border-subtle) !important;
+  }
+
+  /* Tag */
+  .ant-tag {
+    background: var(--bg-tertiary) !important;
+    border-color: var(--border-default) !important;
+    color: var(--text-secondary) !important;
+  }
+
+  /* Card */
+  .ant-card {
+    background: var(--bg-tertiary) !important;
+    border-color: var(--border-subtle) !important;
+  }
+
+  /* Form */
+  .ant-form-item-label > label {
+    color: var(--text-secondary) !important;
+  }
+
+  /* Checkbox */
+  .ant-checkbox-inner {
+    background: var(--bg-primary) !important;
+    border-color: var(--border-default) !important;
+  }
+
+  /* Switch */
+  .ant-switch {
+    background: var(--border-default) !important;
+  }
+
+  .ant-switch-checked {
+    background: var(--primary) !important;
+  }
+
+  /* Popover */
+  .ant-popover-inner {
+    background: var(--bg-elevated) !important;
+    box-shadow: var(--shadow-md) !important;
+  }
+
+  /* Dropdown */
+  .ant-dropdown-menu {
+    background: var(--bg-elevated) !important;
+    border: 1px solid var(--border-default) !important;
+    box-shadow: var(--shadow-md) !important;
+  }
+
+  .ant-dropdown-menu-item {
+    color: var(--text-secondary) !important;
+  }
+
+  .ant-dropdown-menu-item:hover {
+    background: var(--bg-tertiary) !important;
+    color: var(--text-primary) !important;
+  }
+}
+
+/* ========================================
+   Theme Toggle Button
+   ======================================== */
+
+.theme-toggle-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-md);
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: var(--transition-smooth);
+}
+
+.theme-toggle-btn:hover {
+  background: var(--bg-elevated);
+  color: var(--primary);
+  border-color: var(--primary);
 }
