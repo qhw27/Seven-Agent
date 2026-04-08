@@ -38,7 +38,11 @@
       "Bash(ls:*)",
       "Bash(npm test:*)",
       "Bash(npm run:*)",
-      "Bash(cp:*)"
+      "Bash(cp:*)",
+      "Bash(python3:*)",
+      "Bash(where:*)",
+      "Bash(npm install:*)",
+      "Bash(npx tsx:*)"
     ]
   }
 }

@@ -93,45 +93,11 @@
 
 /* 默认使用深色主题 */
 :root {
-  --primary: #6366f1;
-  --primary-hover: #4f46e5;
-  --primary-light: #818cf8;
-  --accent: #8b5cf6;
-  --accent-hover: #7c3aed;
+
   
-  /* 渐变背景 */
-  --gradient-primary: linear-gradient(135deg, #6366f1 0%, #8b5cf6 50%, #a855f7 100%);
-  --gradient-glow: linear-gradient(135deg, rgba(99, 102, 241, 0.3) 0%, rgba(139, 92, 246, 0.3) 100%);
+
   
-  /* 背景色 - 深色模式 */
-  --bg-primary: #0a0a0f;
-  --bg-secondary: #12121a;
-  --bg-tertiary: #1a1a24;
-  --bg-elevated: #22222e;
-  --bg-glass: rgba(18, 18, 26, 0.85);
-  
-  /* 文字颜色 */
-  --text-primary: #f4f4f5;
-  --text-secondary: #a1a1aa;
-  --text-muted: #71717a;
-  --text-inverse: #0a0a0f;
-  
-  /* 边框与分割线 */
-  --border-subtle: rgba(255, 255, 255, 0.06);
-  --border-default: rgba(255, 255, 255, 0.1);
-  --border-strong: rgba(255, 255, 255, 0.15);
-  
-  /* 功能色 */
-  --success: #10b981;
-  --warning: #f59e0b;
-  --error: #ef4444;
-  --info: #3b82f6;
-  
-  /* 阴影 */
-  --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.3);
-  --shadow-md: 0 4px 16px rgba(0, 0, 0, 0.4);
-  --shadow-lg: 0 8px 32px rgba(0, 0, 0, 0.5);
-  --shadow-glow: 0 0 30px rgba(99, 102, 241, 0.3);
+
   
   /* 间距 */
   --spacing-xs: 4px;
@@ -169,11 +135,46 @@ html, body, #root {
   overflow: hidden;
 }
 
+/* ========================================
+   Theme Background - 关键修复！
+   ======================================== */
+
+/* 深色主题背景 - 使用 !important 确保优先级 */
+html[data-theme="dark"] {
+  background: #0a0a0f !important;
+}
+
+body[data-theme="dark"] {
+  background: #0a0a0f !important;
+}
+
+/* 浅色主题背景 - 使用 !important 确保优先级 */
+html[data-theme="light"] {
+  background: #ffffff !important;
+}
+
+body[data-theme="light"] {
+  background: #ffffff !important;
+}
+
+/* 默认深色主题（当没有 data-theme 属性时） */
+html:not([data-theme]) {
+  background: #0a0a0f;
+}
+
+body:not([data-theme]) {
+  background: #0a0a0f;
+}
+
+html {
+  background: var(--bg-primary, #0a0a0f);
+}
+
 body {
   font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'SF Pro Text', 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-  background: var(--bg-primary);
+  background: var(--bg-primary, #0a0a0f);
   color: var(--text-primary);
   line-height: 1.5;
 }
@@ -676,6 +677,34 @@ body {
     background: var(--bg-tertiary) !important;
     color: var(--text-primary) !important;
   }
+}
+
+/* ========================================
+   Tabs & Scroll Fixes
+   ======================================== */
+
+/* 确保 Tabs 内容可以滚动 */
+.ant-tabs-content {
+  overflow: auto !important;
+}
+
+.ant-tabs-tabpane {
+  overflow: auto !important;
+}
+
+/* 确保 Spin 容器可以滚动 */
+.ant-spin-container {
+  overflow: auto !important;
+  height: 100%;
+}
+
+/* List 滚动容器 */
+.ant-list {
+  overflow: auto !important;
+}
+
+.ant-list-body {
+  overflow: auto !important;
 }
 
 /* ========================================

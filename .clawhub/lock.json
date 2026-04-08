@@ -8,6 +8,10 @@
     "baidu-search": {
       "version": "1.1.3",
       "installedAt": 1775187492110
+    },
+    "weather": {
+      "version": "1.0.0",
+      "installedAt": 1775556119502
     }
   }
 }

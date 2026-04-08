@@ -17,6 +17,7 @@ import { Input, message } from 'antd'
 import ChatArea from './components/ChatArea'
 import ModelSettings from './components/ModelSettings'
 import ToolsTab from './components/ToolsTab'
+import { PluginsTab } from './components/PluginsTab'
 import TitleBar from './components/TitleBar'
 import './styles/index.css'
 
@@ -24,6 +25,7 @@ import './styles/index.css'
 const tools = [
   { key: 'chat', icon: <MessageOutlined />, title: '对话', label: 'Chat' },
   { key: 'tools', icon: <ToolOutlined />, title: '工具', label: 'Tools' },
+  { key: 'plugins', icon: <ExperimentOutlined />, title: '插件', label: 'Plugins' },
   { key: 'knowledge', icon: <BookOutlined />, title: '知识库', label: 'Knowledge' },
   { key: 'models', icon: <ExperimentOutlined />, title: '模型', label: 'Models' }
 ]
@@ -68,7 +70,7 @@ function App(): JSX.Element {
   // 创建新会话
   const handleNewSession = async () => {
     try {
-      const newSession = await window.api.session.create({
+      const newSession = await window.electronAPI.session.create({
         id: 'session_' + Date.now(),
         title: '新对话',
         model: 'minimax'
@@ -87,7 +89,7 @@ function App(): JSX.Element {
 
   const loadSessions = async () => {
     try {
-      const result = await window.api.session.getList(0, 50)
+      const result = await window.electronAPI.session.getList(0, 50)
       if (result.sessions && result.sessions.length > 0) {
         // 按更新时间排序，置顶的在前
         const sortedSessions = result.sessions.sort((a: Session, b: Session) => {
@@ -115,7 +117,7 @@ function App(): JSX.Element {
   const handleDeleteSession = async (e: React.MouseEvent, sessionId: string) => {
     e.stopPropagation()
     try {
-      await window.api.session.delete(sessionId)
+      await window.electronAPI.session.delete(sessionId)
       setSessions(prev => prev.filter(s => s.id !== sessionId))
       if (currentSessionId === sessionId) {
         setCurrentSessionId(sessions[0]?.id || '')
@@ -142,7 +144,7 @@ function App(): JSX.Element {
       return
     }
     try {
-      await window.api.session.update(sessionId, { title: editingTitle.trim() })
+      await window.electronAPI.session.update(sessionId, { title: editingTitle.trim() })
       setSessions(prev => prev.map(s =>
         s.id === sessionId ? { ...s, title: editingTitle.trim() } : s
       ))
@@ -175,6 +177,8 @@ function App(): JSX.Element {
         return <ModelSettings />
       case 'tools':
         return <ToolsTab />
+      case 'plugins':
+        return <PluginsTab />
       default:
         return <ChatArea tool={currentTool} sessionId={currentSessionId} onSessionUpdate={loadSessions} />
     }
@@ -331,13 +335,13 @@ function App(): JSX.Element {
           flex-direction: column;
           height: 100vh;
           background: var(--bg-primary);
-          overflow: hidden;
+          overflow: auto;
         }
 
         .app-main {
           display: flex;
           flex: 1;
-          overflow: hidden;
+          overflow: auto;
         }
 
         /* 侧边栏 */
@@ -348,7 +352,7 @@ function App(): JSX.Element {
           display: flex;
           flex-direction: column;
           transition: width var(--transition-smooth);
-          overflow: hidden;
+          overflow: auto;
         }
 
         .sidebar.collapsed {
@@ -463,7 +467,7 @@ function App(): JSX.Element {
           font-weight: 500;
           color: var(--text-primary);
           white-space: nowrap;
-          overflow: hidden;
+          overflow: auto;
           text-overflow: ellipsis;
         }
 
@@ -554,7 +558,7 @@ function App(): JSX.Element {
           flex: 1;
           display: flex;
           flex-direction: column;
-          overflow: hidden;
+          overflow: auto;
           background: var(--bg-primary);
         }
 
@@ -624,7 +628,7 @@ function App(): JSX.Element {
         /* 内容区域 */
         .content-area {
           flex: 1;
-          overflow: hidden;
+          overflow: auto;
         }
       `}</style>
     </div>

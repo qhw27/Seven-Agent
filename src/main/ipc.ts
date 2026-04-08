@@ -5,7 +5,10 @@ import { aiService, DEFAULT_MODEL, type ChatMessage, type Tool } from './ai-serv
 import { ModelConfig, PRESET_MODELS } from '../shared/model-config'
 import { SkillManager } from './SkillManager'
 import { builtInToolRegistry } from './BuiltInToolRegistry'
+import { pluginManager, setupPluginIpcHandlers } from './plugin-system'
 import type { Skill } from './SkillHelpers'
+import { agentService, buildAllAgentTools } from './agent'
+import type { ThinkingLevel } from './agent'
 
 // 打印环境变量（调试用）
 console.log('[Env] ===== Seven App Start =====')
@@ -417,11 +420,45 @@ function setupIpcHandlers(): void {
         const builtInTools = builtInToolRegistry.getToolDefinitions()
         tools.push(...builtInTools)
 
-        // 2. 添加 SkillHub 技能作为工具
+        // 2. 添加插件工具（Plugin Tools）
         try {
-          const { ipcRenderer } = require('electron')
-          const fetchedTools: Tool[] = await ipcRenderer.invoke('skill:getTools')
-          tools.push(...fetchedTools)
+          const pluginTools = pluginManager.getPluginTools()
+          for (const tool of pluginTools) {
+            tools.push({
+              type: 'function',
+              function: {
+                name: `plugin_${tool.id}`,
+                description: tool.description,
+                parameters: {
+                  type: 'object',
+                  properties: {}
+                }
+              }
+            })
+          }
+        } catch (e) {
+          console.error("[AI] Get plugin tools error:", e)
+        }
+
+        // 3. 添加 SkillHub 技能工具
+        try {
+          const skills = await getAllSkills()
+          for (const skill of skills) {
+            tools.push({
+              type: 'function',
+              function: {
+                name: `skill_${skill.id}`,
+                description: skill.description || `执行技能: ${skill.name}`,
+                parameters: {
+                  type: 'object',
+                  properties: {
+                    query: { type: 'string', description: '要执行的查询或指令' }
+                  },
+                  required: ['query']
+                }
+              }
+            })
+          }
         } catch (e) {
           console.error('[AI] Get tools error:', e)
         }
@@ -472,10 +509,10 @@ function setupIpcHandlers(): void {
       const configured = hasEnvApiKey || hasDbApiKey
 
       allModels.push({
-        id: model.id,
-        name: model.name,
-        provider: model.provider,
-        modelName: model.model,
+        id: model.id || '',
+        name: model.name || model.id || '',
+        provider: model.provider || 'unknown',
+        modelName: model.model || model.id || '',
         endpoint: model.baseURL || '',
         configured,
         apiKey: model.apiKey || dbModel?.api_key
@@ -504,11 +541,11 @@ function setupIpcHandlers(): void {
   // 列出所有可用模型（包括未配置的）
   ipcMain.handle('ai:listAllModels', async () => {
     return PRESET_MODELS.map(model => ({
-      id: model.id,
-      name: model.name,
-      provider: model.provider,
-      modelName: model.model,
-      endpoint: model.baseURL,
+      id: model.id || '',
+      name: model.name || model.id || '',
+      provider: model.provider || 'unknown',
+      modelName: model.model || model.id || '',
+      endpoint: model.baseURL || '',
       configured: false
     }))
   })
@@ -624,9 +661,9 @@ function setupIpcHandlers(): void {
     }
 
     const testConfig: ModelConfig = {
-      id: model.id,
-      name: model.name,
-      provider: model.provider,
+      id: model.id || '',
+      name: model.name || model.id || '',
+      provider: model.provider || 'unknown',
       model: model.model,
       baseURL: modelEndpoint,
       apiKey: apiKey || model.apiKey || '',
@@ -811,6 +848,114 @@ function setupIpcHandlers(): void {
       return JSON.stringify({ error: (error as Error).message })
     }
   })
+
+  // ========== Agent 相关 IPC 处理器 ==========
+
+  // Agent 初始化
+  ipcMain.handle('agent:init', async (_event, config?: { systemPrompt?: string; thinkingLevel?: string }) => {
+    try {
+      await agentService.initialize({
+        systemPrompt: config?.systemPrompt,
+        thinkingLevel: config?.thinkingLevel as ThinkingLevel | undefined,
+      })
+      return { success: true }
+    } catch (error) {
+      console.error('[IPC] agent:init error:', error)
+      return { success: false, error: (error as Error).message }
+    }
+  })
+
+  // Agent 发送消息
+  ipcMain.handle('agent:prompt', async (_event, input: string) => {
+    try {
+      const result = await agentService.prompt(input)
+      return { success: true, content: result }
+    } catch (error) {
+      console.error('[IPC] agent:prompt error:', error)
+      return { success: false, error: (error as Error).message }
+    }
+  })
+
+  // Agent 中止
+  ipcMain.handle('agent:abort', async () => {
+    try {
+      agentService.abort()
+      return { success: true }
+    } catch (error) {
+      return { success: false, error: (error as Error).message }
+    }
+  })
+
+  // Agent 重置
+  ipcMain.handle('agent:reset', async () => {
+    try {
+      agentService.reset()
+      return { success: true }
+    } catch (error) {
+      return { success: false, error: (error as Error).message }
+    }
+  })
+
+  // Agent 获取消息历史
+  ipcMain.handle('agent:getMessages', async () => {
+    try {
+      const messages = agentService.getMessages()
+      return { success: true, messages }
+    } catch (error) {
+      return { success: false, error: (error as Error).message }
+    }
+  })
+
+  // Agent 清除消息
+  ipcMain.handle('agent:clearMessages', async () => {
+    try {
+      agentService.clearMessages()
+      return { success: true }
+    } catch (error) {
+      return { success: false, error: (error as Error).message }
+    }
+  })
+
+  // Agent 设置系统提示词
+  ipcMain.handle('agent:setSystemPrompt', async (_event, prompt: string) => {
+    try {
+      agentService.setSystemPrompt(prompt)
+      return { success: true }
+    } catch (error) {
+      return { success: false, error: (error as Error).message }
+    }
+  })
+
+  // Agent 重新加载工具
+  ipcMain.handle('agent:reloadTools', async () => {
+    try {
+      const tools = await buildAllAgentTools()
+      agentService.setTools(tools)
+      return { success: true, toolCount: tools.length }
+    } catch (error) {
+      return { success: false, error: (error as Error).message }
+    }
+  })
+
+  // Agent Steering - 运行时注入消息
+  ipcMain.handle('agent:steer', async (_event, message: string) => {
+    try {
+      agentService.steer(message)
+      return { success: true }
+    } catch (error) {
+      return { success: false, error: (error as Error).message }
+    }
+  })
+
+  // Agent FollowUp - 完成后处理
+  ipcMain.handle('agent:followUp', async (_event, message: string) => {
+    try {
+      agentService.followUp(message)
+      return { success: true }
+    } catch (error) {
+      return { success: false, error: (error as Error).message }
+    }
+  })
 }
 
 
@@ -823,28 +968,60 @@ async function startApp(): Promise<void> {
   serverPort = await startServer()
 
   // 设置 IPC 处理器
+  // 设置插件 IPC 处理器
+  console.log("[IPC] 开始设置插件处理器...");
+  setupPluginIpcHandlers();
+  console.log("[IPC] 插件处理器设置完成")
   setupIpcHandlers()
 
   // 设置工具执行器（用于AI工具调用循环）
-  // 优先使用内置工具，其次使用 SkillHub 技能
+  // 优先使用内置工具，其次使用插件，最后使用 Skills
   aiService.setToolExecutor(async (toolName: string, args: string): Promise<string> => {
     try {
-      // 1. 尝试内置工具
+      // 1. 尝试内置工具（Built-in Tools）
       const builtInTool = builtInToolRegistry.getToolByName(toolName)
       if (builtInTool) {
+        console.log('[Tool] 🚀 执行内置工具 (Built-in Tool):', toolName)
         return await builtInToolRegistry.executeTool(toolName, args)
       }
 
-      // 2. 尝试 SkillHub 技能
+      // 2. 尝试插件工具（Plugin Tools）
+      if (toolName.startsWith('plugin_')) {
+        const pluginToolId = toolName.replace('plugin_', '')
+        console.log('[Tool] 🔌 执行插件工具 (Plugin):', toolName, '->', pluginToolId)
+        try {
+          const pluginResult = await ipcMain.emit('plugin:executeTool', pluginToolId, args)
+          return JSON.stringify({ result: 'Plugin tool execution not fully implemented' })
+        } catch (pluginError) {
+          console.error('[Tool] 🔌 插件执行失败 (Plugin error):', pluginError)
+          return JSON.stringify({ error: (pluginError as Error).message })
+        }
+      }
+
+      // 3. 尝试技能工具（Skills）
+      if (toolName.startsWith('skill_')) {
+        const skillManager = getSkillManager()
+        const skillId = toolName.substring(6) // skill_xxx -> xxx
+        const parsedArgs = JSON.parse(args)
+        const queryStr = parsedArgs.query || args
+
+        console.log('[Tool] ⚡ 执行技能 (Skill):', toolName, '->', skillId, 'query:', queryStr)
+
+        const result = await skillManager.executeSkill(skillId, queryStr)
+        return result.success ? result.output : JSON.stringify({ error: result.error })
+      }
+
+      // 4. 如果都不是，尝试作为 skill 执行
+      console.log('[Tool] ⚡ 尝试作为技能执行 (Fallback to Skill):', toolName)
       const skillManager = getSkillManager()
-      const skillId = toolName.startsWith('skill_') ? toolName.substring(6) : toolName
+      const skillId = toolName
       const parsedArgs = JSON.parse(args)
       const queryStr = parsedArgs.query || args
 
       const result = await skillManager.executeSkill(skillId, queryStr)
       return result.success ? result.output : JSON.stringify({ error: result.error })
     } catch (error) {
-      console.error('[Tool] Execute error:', error)
+      console.error('[Tool] ❌ 工具执行失败 (Execute error):', error)
       return JSON.stringify({ error: (error as Error).message })
     }
   })

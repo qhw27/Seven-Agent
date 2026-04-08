@@ -26,7 +26,9 @@ const api = {
   },
   // AI 模型操作
   ai: {
-    chat: (messages: unknown[], options?: { model?: string }) => ipcRenderer.invoke('ai:chat', messages, options),
+    chat: (messages: unknown[], options?: { model?: string; useTools?: boolean; abortSignal?: AbortSignal }) => 
+      ipcRenderer.invoke('ai:chat', messages, options),
+    abortChat: () => ipcRenderer.invoke('ai:abort'),
     listModels: () => ipcRenderer.invoke('ai:listModels'),
     listAllModels: () => ipcRenderer.invoke('ai:listAllModels'),
     setModelConfig: (config: { id: string; apiKey: string }) => ipcRenderer.invoke('ai:setModelConfig', config),
@@ -67,16 +69,52 @@ const api = {
   }
 }
 
+// 插件 API (与主进程 IPC 通信)
+const pluginApi = {
+  list: () => ipcRenderer.invoke('plugin:list'),
+  getMarket: () => ipcRenderer.invoke('plugin:getMarket'),
+  search: (query: string) => ipcRenderer.invoke('plugin:search', query),
+  download: (pluginId: string) => ipcRenderer.invoke('plugin:download', pluginId),
+  install: (pluginPath: string) => ipcRenderer.invoke('plugin:install', pluginPath),
+  uninstall: (pluginId: string) => ipcRenderer.invoke('plugin:uninstall', pluginId),
+  enable: (pluginId: string) => ipcRenderer.invoke('plugin:enable', pluginId),
+  disable: (pluginId: string) => ipcRenderer.invoke('plugin:disable', pluginId),
+  openPluginsFolder: () => ipcRenderer.invoke('plugin:openPluginsFolder')
+}
+
+// Agent API (基于 pi-agent-core 架构)
+const agentApi = {
+  init: (config?: { systemPrompt?: string; thinkingLevel?: string }) =>
+    ipcRenderer.invoke('agent:init', config),
+  prompt: (input: string) => ipcRenderer.invoke('agent:prompt', input),
+  abort: () => ipcRenderer.invoke('agent:abort'),
+  reset: () => ipcRenderer.invoke('agent:reset'),
+  getMessages: () => ipcRenderer.invoke('agent:getMessages'),
+  clearMessages: () => ipcRenderer.invoke('agent:clearMessages'),
+  setSystemPrompt: (prompt: string) => ipcRenderer.invoke('agent:setSystemPrompt', prompt),
+  reloadTools: () => ipcRenderer.invoke('agent:reloadTools'),
+  steer: (message: string) => ipcRenderer.invoke('agent:steer', message),
+  followUp: (message: string) => ipcRenderer.invoke('agent:followUp', message)
+}
+
+// 统一的 invoke 方法，支持动态 channel
+const invoke = (channel: string, ...args: unknown[]) => {
+  return ipcRenderer.invoke(channel, ...args)
+}
+
 // Use `contextBridge` APIs to expose Electron APIs to
 // renderer only if context isolation is enabled, otherwise
 // just add to the DOM global.
 if (process.contextIsolated) {
   try {
     contextBridge.exposeInMainWorld('api', api)
+    contextBridge.exposeInMainWorld('electronAPI', { ...api, plugin: pluginApi, agent: agentApi, invoke })
   } catch (error) {
     console.error(error)
   }
 } else {
   // @ts-ignore (define in dts)
   window.api = api
+  // @ts-ignore
+  window.electronAPI = { ...api, plugin: pluginApi, agent: agentApi, invoke }
 }

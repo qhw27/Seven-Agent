@@ -1,0 +1,23 @@
+{
+  "id": "example-hello",
+  "name": "Hello World 示例插件",
+  "version": "1.0.0",
+  "description": "这是一个示例插件，展示插件系统的基本用法",
+  "author": "Seven Team",
+  "main": "index.js",
+  "permissions": ["log", "db"],
+  "settings": [
+    {
+      "key": "greeting",
+      "label": "问候语",
+      "type": "text",
+      "default": "Hello"
+    },
+    {
+      "key": "uppercase",
+      "label": "大写输出",
+      "type": "boolean",
+      "default": false
+    }
+  ]
+}

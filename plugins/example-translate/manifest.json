@@ -1,0 +1,9 @@
+{
+  "id": "example-translate",
+  "name": "翻译插件示例",
+  "version": "1.0.0",
+  "description": "这是一个带工具的示例插件，用于测试插件系统",
+  "author": "Seven Team",
+  "main": "index.js",
+  "permissions": ["log", "db"]
+}

@@ -19,17 +19,17 @@ export interface ModelConfigStore {
 }
 
 export const DEFAULT_MODEL_CONFIG: ModelConfig = {
-  id: 'claude-3-5-sonnet',
-  name: 'Claude 3.5 Sonnet',
-  api: 'anthropic-completions',
-  provider: 'anthropic',
-  model: 'claude-3-5-sonnet-20241022',
-  baseURL: 'https://api.anthropic.com/v1',
-  apiKey: '',
+  id: 'minimax-m2.5',
+  name: 'Minimax M2.5',
+  api: 'minimax-completions',
+  provider: 'minimax',
+  model: 'minimax-m2.5',
+  baseURL: 'http://172.17.124.34:8118/v1',
+  apiKey: 'sk-9uGxyk8v430bpOUkTWuDhpexA6nlsRfdw90lum4NdU7TGUD2',
   reasoning: false,
   input: ['text', 'image'],
-  cost: { input: 3, output: 15, cacheRead: 0.3, cacheWrite: 3.75 },
-  contextWindow: 200000,
+  cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
+  contextWindow: 32000,
   maxTokens: 8192,
 };
 
