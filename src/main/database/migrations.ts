@@ -1,4 +1,5 @@
-import { DatabaseConnection } from './connection'
+import { getDb } from '../database'
+import type Database from 'better-sqlite3'
 
 /**
  * 数据库迁移管理
@@ -11,7 +12,7 @@ export class DatabaseMigrations {
    * 执行所有迁移
    */
   public static runMigrations(): void {
-    const db = DatabaseConnection.getInstance().getConnection()
+    const db = getDb()
 
     try {
       // 创建版本表（如果不存在）
@@ -48,7 +49,7 @@ export class DatabaseMigrations {
   /**
    * 获取当前数据库版本
    */
-  private static getCurrentVersion(db: any): number {
+  private static getCurrentVersion(db: Database.Database): number {
     const row = db.prepare('SELECT MAX(version) as version FROM schema_version').get() as { version: number | null }
     return row?.version || 0
   }
@@ -56,14 +57,14 @@ export class DatabaseMigrations {
   /**
    * 记录迁移版本
    */
-  private static recordMigration(db: any, version: number): void {
+  private static recordMigration(db: Database.Database, version: number): void {
     db.prepare('INSERT INTO schema_version (version, applied_at) VALUES (?, ?)').run(version, new Date().toISOString())
   }
 
   /**
    * 迁移 V1: 创建初始表结构
    */
-  private static migrationV1(db: any): void {
+  private static migrationV1(db: Database.Database): void {
     console.log('[Migration] 执行迁移 V1...')
 
     // 创建会话表
@@ -131,7 +132,7 @@ export class DatabaseMigrations {
   /**
    * 迁移 V2: 更新 message_count 为用户消息数量（对话轮数）
    */
-  private static migrationV2(db: any): void {
+  private static migrationV2(db: Database.Database): void {
     console.log('[Migration] 执行迁移 V2...')
 
     // 更新所有会话的 message_count
@@ -154,11 +155,11 @@ export class DatabaseMigrations {
   /**
    * 迁移 V3: 修复 model_name 字段名为 modelName（与代码保持一致）
    */
-  private static migrationV3(db: any): void {
+  private static migrationV3(db: Database.Database): void {
     console.log('[Migration] 执行迁移 V3...')
 
     // 检查是否存在旧的 model_name 字段
-    const tableInfo = db.prepare('PRAGMA table_info(models)').all() as Array<{ name: string }>
+    const tableInfo = db.pragma('table_info(models)') as Array<{ name: string }>
     const hasOldField = tableInfo.some(col => col.name === 'model_name')
 
     if (hasOldField) {

@@ -1,4 +1,4 @@
-import { DatabaseConnection } from '../database/connection'
+import { getDb } from '../../database'
 
 export interface MessageRow {
   id: string
@@ -13,7 +13,7 @@ export interface MessageRow {
  * 消息仓库 - 负责消息数据的数据库操作
  */
 export class MessageRepository {
-  private static db = () => DatabaseConnection.getInstance().getConnection()
+  private static db = () => getDb()
 
   /**
    * 插入消息

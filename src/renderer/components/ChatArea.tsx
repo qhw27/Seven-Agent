@@ -6,13 +6,14 @@ import {
   UserOutlined,
   DeleteOutlined,
   LoadingOutlined,
-
   ThunderboltOutlined,
   ApiOutlined,
   ToolOutlined,
   TeamOutlined,
-
 } from '@ant-design/icons'
+
+// 导入预览组件
+import MessageContent from './MessageContent'
 
 const { TextArea } = Input
 
@@ -118,14 +119,19 @@ const COMMANDS: Command[] = [
 /model  - 切换当前模型
 /agent  - 切换到 Agent 模式
 /ai     - 切换到传统 AI 模式
+/preview - 预览文件链接
 
 快捷键：
 Shift+Enter - 换行
-Enter - 发送消息`
+Enter - 发送消息
+
+文件链接格式：
+[文件名](URL) - 在消息中显示可预览的文件链接
+<URL|文件名> - 另一种文件链接格式`
       Modal.info({
         title: '帮助',
         content: <pre style={{ whiteSpace: 'pre-wrap', margin: 0, fontFamily: 'inherit' }}>{helpText}</pre>,
-        width: 400,
+        width: 450,
         centered: true
       })
     }
@@ -668,6 +674,9 @@ function ChatArea({ tool, sessionId, onSessionUpdate }: ChatAreaProps): JSX.Elem
               {chatMode === 'ai' && <span className="command-tag">/agent</span>}
               {chatMode === 'agent' && <span className="command-tag">/ai</span>}
             </div>
+            <div className="welcome-preview-tip">
+              💡 消息中可使用 <code>[文件名](URL)</code> 格式添加可预览的文件链接
+            </div>
             {chatMode === 'agent' && (
               <div className="agent-status">
                 <Badge status={agentInitialized ? 'success' : 'default'} />
@@ -686,7 +695,10 @@ function ChatArea({ tool, sessionId, onSessionUpdate }: ChatAreaProps): JSX.Elem
                 {msg.role === 'user' ? <UserOutlined /> : (chatMode === 'agent' ? <ThunderboltOutlined /> : <RobotOutlined />)}
               </div>
               <div className="message-content">
-                <div className="message-text">{msg.content}</div>
+                <div className="message-text">
+                  {/* 使用 MessageContent 组件渲染消息，支持文件链接预览 */}
+                  <MessageContent content={msg.content} />
+                </div>
                 {/* 显示工具调用信息 */}
                 {msg.toolCalls && msg.toolCalls.length > 0 && (
                   <div className="tool-calls-info">
@@ -1006,6 +1018,23 @@ function ChatArea({ tool, sessionId, onSessionUpdate }: ChatAreaProps): JSX.Elem
           font-size: 13px;
           color: var(--text-secondary);
           font-family: monospace;
+        }
+
+        .welcome-preview-tip {
+          margin-top: 16px;
+          padding: 10px 16px;
+          background: var(--bg-tertiary);
+          border-radius: 8px;
+          font-size: 13px;
+          color: var(--text-muted);
+        }
+
+        .welcome-preview-tip code {
+          background: var(--bg-secondary);
+          padding: 2px 6px;
+          border-radius: 4px;
+          font-family: monospace;
+          color: var(--primary-light);
         }
 
         .agent-status {

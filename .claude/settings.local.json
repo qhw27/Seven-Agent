@@ -42,7 +42,14 @@
       "Bash(python3:*)",
       "Bash(where:*)",
       "Bash(npm install:*)",
-      "Bash(npx tsx:*)"
+      "Bash(npx tsx:*)",
+      "Bash(npm view:*)",
+      "Bash(npx electron:*)",
+      "WebSearch",
+      "Bash(npx:*)",
+      "Bash(npm_config_runtime=electron npm_config_target=41.1.1 npm_config_disturl=https://electronjs.org/headers pnpm rebuild:*)",
+      "Bash(npm_config_runtime=electron npm_config_target=41.1.1 npm_config_disturl=https://electronjs.org/headers npx prebuild-install:*)",
+      "Bash(npm_config_runtime=electron npm_config_target=34.5.8 npm_config_disturl=https://electronjs.org/headers npx prebuild-install:*)"
     ]
   }
 }

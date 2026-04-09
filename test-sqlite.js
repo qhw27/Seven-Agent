@@ -1,0 +1,1 @@
+const Database = require('better-sqlite3'); const db = new Database(':memory:'); db.exec('CREATE TABLE test (id INTEGER PRIMARY KEY, name TEXT)'); db.exec("INSERT INTO test VALUES (1, 'hello')"); const row = db.prepare('SELECT * FROM test').get(); console.log('✅ better-sqlite3 works in Electron\!', JSON.stringify(row)); db.close(); process.exit(0);

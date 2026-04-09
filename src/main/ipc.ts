@@ -1,5 +1,5 @@
 ﻿import { ipcMain } from 'electron'
-import { initDatabase, query, run, get, all, saveDatabase } from './database'
+import { initDatabase, query, run, get, all } from './database'
 import { startServer } from './server'
 import { aiService, DEFAULT_MODEL, type ChatMessage, type Tool } from './ai-service'
 import { ModelConfig, PRESET_MODELS } from '../shared/model-config'
@@ -70,7 +70,7 @@ async function getAllSkills(): Promise<Skill[]> {
 
 // IPC 处理器
 function setupIpcHandlers(): void {
-  // 数据库操作 (使用 sql.js)
+  // 数据库操作 (使用 better-sqlite3)
   ipcMain.handle('db:query', async (_event, sql: string, params?: unknown[]) => {
     try {
       return query(sql, params || [])
@@ -92,13 +92,12 @@ function setupIpcHandlers(): void {
     return all(sql, params || [])
   })
 
-  // 会话操作 - 使用 sql.js
+  // 会话操作
   ipcMain.handle('db-create-session', async (_event, sessionData: any) => {
     try {
       const now = new Date().toISOString()
       run('INSERT INTO sessions (id, title, model, thinking_level, created_at, last_modified, message_count) VALUES (?, ?, ?, ?, ?, ?, ?)',
         [sessionData.id, sessionData.title, sessionData.model, sessionData.thinkingLevel || 'medium', now, now, 0])
-      saveDatabase()
       return { id: sessionData.id, title: sessionData.title, model: sessionData.model, createdAt: now, lastModified: now, messageCount: 0 }
     } catch (error) {
       console.error('[IPC] create-session error:', error)
@@ -187,7 +186,6 @@ function setupIpcHandlers(): void {
       const now = new Date().toISOString()
       const titleValue = typeof newTitle === 'string' ? newTitle : (newTitle || '')
       run('UPDATE sessions SET title = ?, last_modified = ? WHERE id = ?', [titleValue.trim(), now, sessionId])
-      saveDatabase()
       const session = get<any>('SELECT * FROM sessions WHERE id = ?', [sessionId])
       return {
         id: session.id,
@@ -208,7 +206,6 @@ function setupIpcHandlers(): void {
     try {
       run('DELETE FROM messages WHERE session_id = ?', [sessionId])
       run('DELETE FROM sessions WHERE id = ?', [sessionId])
-      saveDatabase()
       return { success: true }
     } catch (error) {
       console.error('[IPC] delete-session error:', error)
@@ -245,7 +242,6 @@ function setupIpcHandlers(): void {
       // 更新会话消息数量
       const userMsgCount = get<any>('SELECT COUNT(*) as count FROM messages WHERE session_id = ? AND role = ?', [sessionId, 'user'])?.count || 0
       run('UPDATE sessions SET message_count = ?, last_modified = ? WHERE id = ?', [userMsgCount, now, sessionId])
-      saveDatabase()
 
       return {
         id: messageData.id,
@@ -269,7 +265,6 @@ function setupIpcHandlers(): void {
         const userMsgCount = get<any>('SELECT COUNT(*) as count FROM messages WHERE session_id = ? AND role = ?', [message.session_id, 'user'])?.count || 0
         const now = new Date().toISOString()
         run('UPDATE sessions SET message_count = ?, last_modified = ? WHERE id = ?', [userMsgCount, now, message.session_id])
-        saveDatabase()
       }
       return { success: true }
     } catch (error) {
@@ -293,7 +288,6 @@ function setupIpcHandlers(): void {
           }
         }
       }
-      saveDatabase()
       return { success: true }
     } catch (error) {
       console.error('[IPC] save-session-batch error:', error)
@@ -585,7 +579,6 @@ function setupIpcHandlers(): void {
         [finalId, finalName, finalProvider, apiKey || '', finalEndpoint, finalModelName])
     }
 
-    saveDatabase()
     return { success: true, message: '模型配置已保存' }
   })
 
@@ -595,7 +588,6 @@ function setupIpcHandlers(): void {
 
     if (existing) {
       run('DELETE FROM models WHERE id = ?', [modelId])
-      saveDatabase()
       return { success: true, message: '模型已删除' }
     } else {
       return { success: false, message: '模型不存在' }
@@ -961,7 +953,7 @@ function setupIpcHandlers(): void {
 
 // 启动应用
 async function startApp(): Promise<void> {
-  // 初始化数据库（使用 sql.js）
+  // 初始化数据库（使用 better-sqlite3）
   await initDatabase()
 
   // 启动后端服务

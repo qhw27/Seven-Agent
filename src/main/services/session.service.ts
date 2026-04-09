@@ -2,7 +2,7 @@ import { SessionRepository, SessionRow } from '../database/repositories/session.
 import { MessageRepository, MessageRow } from '../database/repositories/message.repository'
 import { SessionValidator } from '../validators/session.validator'
 import { SessionTransformer, SessionDTO, SessionListDTO, MessageDTO, SessionEntity, MessageEntity } from '../transformers/session.transformer'
-import { DatabaseConnection } from '../database/connection'
+import { getDb } from '../database'
 
 /**
  * 会话业务逻辑层

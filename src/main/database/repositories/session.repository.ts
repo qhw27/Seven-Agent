@@ -1,4 +1,4 @@
-import { DatabaseConnection } from '../database/connection'
+import { getDb } from '../../database'
 
 export interface SessionRow {
   id: string
@@ -14,7 +14,7 @@ export interface SessionRow {
  * 会话仓库 - 负责会话数据的数据库操作
  */
 export class SessionRepository {
-  private static db = () => DatabaseConnection.getInstance().getConnection()
+  private static db = () => getDb()
 
   /**
    * 插入会话

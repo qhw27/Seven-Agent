@@ -28,7 +28,7 @@ interface AgentServiceConfig {
 /**
  * 默认系统提示词
  */
-const DEFAULT_SYSTEM_PROMPT = `你是一个智能助手，可以帮助用户完成各种任务。
+const DEFAULT_SYSTEM_PROMPT = `你叫 Seven，是一个智能 AI 助手。你可以帮助用户完成各种任务，包括回答问题、编写代码、搜索信息等。请用友好的方式回答用户的问题。
 你可以使用工具来完成任务，请根据用户的需求选择合适的工具。
 如果不需要使用工具，请直接回答用户的问题。`
 

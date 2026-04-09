@@ -311,10 +311,8 @@ export class PluginManager {
         return get(sql, params)
       },
       dbRun: async (sql: string, params?: any[]) => {
-        const { run, saveDatabase } = await import('../database')
-        const result = run(sql, params)
-        saveDatabase()
-        return result
+        const { run } = await import('../database')
+        return run(sql, params)
       }
     }
   }
